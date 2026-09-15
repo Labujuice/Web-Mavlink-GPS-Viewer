@@ -19,6 +19,16 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
     return saved ? Number(saved) : 55;
   });
 
+  const [snrSortBy, setSnrSortBy] = useState<'prn' | 'snr'>(() => {
+    const saved = localStorage.getItem('mav_snr_sort');
+    return saved === 'snr' ? 'snr' : 'prn';
+  });
+
+  const handleSortChange = (mode: 'prn' | 'snr') => {
+    setSnrSortBy(mode);
+    localStorage.setItem('mav_snr_sort', mode);
+  };
+
   // Initialize ECharts instances
   useEffect(() => {
     if (polarRef.current) {
@@ -194,7 +204,15 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
   useEffect(() => {
     if (!barChartRef.current) return;
 
-    const validSats = satellites.filter((s) => s.prn > 0).sort((a, b) => a.prn - b.prn);
+    let validSats = satellites.filter((s) => s.prn > 0);
+    if (snrSortBy === 'snr') {
+      // Sort by SNR strength descending (highest SNR first); if equal, sort by PRN
+      validSats = [...validSats].sort((a, b) => b.snr - a.snr || a.prn - b.prn);
+    } else {
+      // Sort by PRN ascending
+      validSats = [...validSats].sort((a, b) => a.prn - b.prn);
+    }
+
     const prnLabels = validSats.map((s) => `#${s.prn}`);
     const snrValues = validSats.map((s) => ({
       value: s.snr,
@@ -208,7 +226,7 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
     const barOption: echarts.EChartsOption = {
       backgroundColor: '#000000',
       title: {
-        text: 'CARRIER-TO-NOISE (C/N0 / SNR)',
+        text: `CARRIER-TO-NOISE (${snrSortBy === 'snr' ? 'BY SNR' : 'BY PRN'})`,
         left: 10,
         top: 8,
         textStyle: {
@@ -228,7 +246,13 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
         backgroundColor: '#050805',
         borderColor: '#00ff66',
         textStyle: { color: '#00ff66', fontFamily: 'monospace', fontSize: 11 },
-        formatter: (params: any) => `PRN: ${params.name}<br/>SNR: ${params.value} dB-Hz`,
+        formatter: (params: any) => {
+          const sat = validSats[params.dataIndex];
+          const statusText = sat?.used
+            ? '<span style="color:#00ff66;font-weight:bold;">USED</span>'
+            : '<span style="color:#71717a;">UNUSED</span>';
+          return `PRN: ${params.name}<br/>SNR: ${params.value} dB-Hz<br/>Status: ${statusText}`;
+        },
       },
       xAxis: {
         type: 'category',
@@ -264,7 +288,7 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
     };
 
     barChartRef.current.setOption(barOption);
-  }, [satellites]);
+  }, [satellites, snrSortBy]);
 
   return (
     <div
@@ -291,12 +315,41 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
         title="拖曳調整星空圖與SNR比例，雙擊重設"
       />
 
-      {/* SNR Bar Chart */}
+      {/* SNR Bar Chart Container */}
       <div
         style={{ height: `calc(${100 - splitPercent}% - 8px)` }}
-        className="min-h-[90px] w-full relative overflow-hidden"
-        ref={barRef}
-      />
+        className="min-h-[90px] w-full relative overflow-hidden flex flex-col"
+      >
+        {/* Sort Switcher Controls in top-right */}
+        <div className="absolute top-1.5 right-2 z-10 flex items-center gap-1 font-mono text-[10px] select-none bg-black/80 px-1.5 py-0.5 border border-cyber-border/80">
+          <span className="text-cyber-muted text-[9px] mr-0.5 hidden sm:inline">SORT:</span>
+          <button
+            onClick={() => handleSortChange('prn')}
+            className={`px-1.5 py-0.5 text-[10px] border transition-colors ${
+              snrSortBy === 'prn'
+                ? 'border-cyber-line text-cyber-line bg-cyber-line/20 font-bold'
+                : 'border-transparent text-cyber-muted hover:text-cyber-line'
+            }`}
+            title="依照衛星 PRN 編號順序排列 (PRN 1 -> 32...)"
+          >
+            # PRN
+          </button>
+          <span className="text-cyber-border">|</span>
+          <button
+            onClick={() => handleSortChange('snr')}
+            className={`px-1.5 py-0.5 text-[10px] border transition-colors ${
+              snrSortBy === 'snr'
+                ? 'border-cyber-line text-cyber-line bg-cyber-line/20 font-bold'
+                : 'border-transparent text-cyber-muted hover:text-cyber-line'
+            }`}
+            title="依照訊號 SNR 強度降序排列 (高至低)"
+          >
+            SNR 📶
+          </button>
+        </div>
+
+        <div className="w-full h-full" ref={barRef} />
+      </div>
     </div>
   );
 };
