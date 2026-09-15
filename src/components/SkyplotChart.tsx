@@ -1,16 +1,23 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as echarts from 'echarts';
 import { SatelliteInfo } from '../types/mavlink';
+import { Splitter } from './Splitter';
 
 interface SkyplotChartProps {
   satellites: SatelliteInfo[];
 }
 
 export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const polarRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const polarChartRef = useRef<echarts.ECharts | null>(null);
   const barChartRef = useRef<echarts.ECharts | null>(null);
+
+  const [splitPercent, setSplitPercent] = useState<number>(() => {
+    const saved = localStorage.getItem('mav_skyplot_split');
+    return saved ? Number(saved) : 55;
+  });
 
   // Initialize ECharts instances
   useEffect(() => {
@@ -27,12 +34,36 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
     };
     window.addEventListener('resize', handleResize);
 
+    const resizeObserver = new ResizeObserver(() => {
+      polarChartRef.current?.resize();
+      barChartRef.current?.resize();
+    });
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
     return () => {
       window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       polarChartRef.current?.dispose();
       barChartRef.current?.dispose();
     };
   }, []);
+
+  const handleSplitDrag = (deltaPx: number) => {
+    if (!containerRef.current) return;
+    const totalHeight = containerRef.current.clientHeight;
+    if (totalHeight <= 0) return;
+    const deltaPercent = (deltaPx / totalHeight) * 100;
+    setSplitPercent((prev) => {
+      const next = Math.max(25, Math.min(75, Math.round((prev + deltaPercent) * 10) / 10));
+      localStorage.setItem('mav_skyplot_split', String(next));
+      return next;
+    });
+    // Trigger charts resize during drag
+    polarChartRef.current?.resize();
+    barChartRef.current?.resize();
+  };
 
   // Update Polar Skyplot
   useEffect(() => {
@@ -236,11 +267,36 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
   }, [satellites]);
 
   return (
-    <div className="flex flex-col h-full bg-cyber-black border border-cyber-border corner-box">
+    <div
+      ref={containerRef}
+      className="flex flex-col h-full bg-cyber-black border border-cyber-border corner-box overflow-hidden"
+    >
       {/* Skyplot Polar Chart */}
-      <div className="h-1/2 min-h-[220px] w-full border-b border-cyber-border relative" ref={polarRef} />
+      <div
+        style={{ height: `${splitPercent}%` }}
+        className="min-h-[100px] w-full relative overflow-hidden"
+        ref={polarRef}
+      />
+
+      {/* Resizable Divider */}
+      <Splitter
+        direction="horizontal"
+        onDrag={handleSplitDrag}
+        onDoubleClick={() => {
+          setSplitPercent(55);
+          localStorage.setItem('mav_skyplot_split', '55');
+          polarChartRef.current?.resize();
+          barChartRef.current?.resize();
+        }}
+        title="拖曳調整星空圖與SNR比例，雙擊重設"
+      />
+
       {/* SNR Bar Chart */}
-      <div className="h-1/2 min-h-[140px] w-full relative" ref={barRef} />
+      <div
+        style={{ height: `calc(${100 - splitPercent}% - 8px)` }}
+        className="min-h-[90px] w-full relative overflow-hidden"
+        ref={barRef}
+      />
     </div>
   );
 };

@@ -29,8 +29,16 @@ export const CepChart: React.FC<CepChartProps> = ({
     const handleResize = () => echartsInstance.current?.resize();
     window.addEventListener('resize', handleResize);
 
+    const resizeObserver = new ResizeObserver(() => {
+      echartsInstance.current?.resize();
+    });
+    if (chartRef.current) {
+      resizeObserver.observe(chartRef.current);
+    }
+
     return () => {
       window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       echartsInstance.current?.dispose();
     };
   }, []);

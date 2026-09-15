@@ -8,6 +8,7 @@ import { MessageInspector } from './components/MessageInspector';
 import { ExportModal } from './components/ExportModal';
 import { SerialPortModal } from './components/SerialPortModal';
 import { MessageRateModal } from './components/MessageRateModal';
+import { Splitter } from './components/Splitter';
 
 import { MavlinkDecoder } from './mavlink/decoder';
 import { encodeSetMessageInterval, encodeRequestMessage } from './mavlink/encoder';
@@ -64,6 +65,110 @@ export const App: React.FC = () => {
 
   // CEP State
   const [manualRefCoord, setManualRefCoord] = useState<{ lat: number; lon: number } | null>(null);
+
+  // Layout Resizing State
+  const dashboardRef = useRef<HTMLDivElement>(null);
+  const [isDesktop, setIsDesktop] = useState<boolean>(
+    () => (typeof window !== 'undefined' ? window.innerWidth >= 1024 : true)
+  );
+
+  const [colWidths, setColWidths] = useState<[number, number, number]>(() => {
+    try {
+      const saved = localStorage.getItem('mav_col_widths');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length === 3) return parsed as [number, number, number];
+      }
+    } catch {}
+    return [40, 28, 32];
+  });
+
+  const [inspectorHeight, setInspectorHeight] = useState<number>(() => {
+    const saved = localStorage.getItem('mav_inspector_h');
+    return saved ? Number(saved) : 230;
+  });
+
+  useEffect(() => {
+    const handleWinResize = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener('resize', handleWinResize);
+    return () => window.removeEventListener('resize', handleWinResize);
+  }, []);
+
+  const handleCol1Col2Drag = (deltaPx: number) => {
+    if (!dashboardRef.current) return;
+    const totalW = dashboardRef.current.clientWidth;
+    if (totalW <= 0) return;
+    const deltaPercent = (deltaPx / totalW) * 100;
+
+    setColWidths(([c1, c2, c3]) => {
+      let newC1 = c1 + deltaPercent;
+      let newC2 = c2 - deltaPercent;
+      if (newC1 < 15) {
+        newC2 += newC1 - 15;
+        newC1 = 15;
+      } else if (newC2 < 15) {
+        newC1 += newC2 - 15;
+        newC2 = 15;
+      }
+      const updated: [number, number, number] = [
+        Math.round(newC1 * 10) / 10,
+        Math.round(newC2 * 10) / 10,
+        c3,
+      ];
+      localStorage.setItem('mav_col_widths', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleCol2Col3Drag = (deltaPx: number) => {
+    if (!dashboardRef.current) return;
+    const totalW = dashboardRef.current.clientWidth;
+    if (totalW <= 0) return;
+    const deltaPercent = (deltaPx / totalW) * 100;
+
+    setColWidths(([c1, c2, c3]) => {
+      let newC2 = c2 + deltaPercent;
+      let newC3 = c3 - deltaPercent;
+      if (newC2 < 15) {
+        newC3 += newC2 - 15;
+        newC2 = 15;
+      } else if (newC3 < 15) {
+        newC2 += newC3 - 15;
+        newC3 = 15;
+      }
+      const updated: [number, number, number] = [
+        c1,
+        Math.round(newC2 * 10) / 10,
+        Math.round(newC3 * 10) / 10,
+      ];
+      localStorage.setItem('mav_col_widths', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleResetCols = () => {
+    const def: [number, number, number] = [40, 28, 32];
+    setColWidths(def);
+    localStorage.setItem('mav_col_widths', JSON.stringify(def));
+  };
+
+  const handleInspectorDrag = (deltaY: number) => {
+    setInspectorHeight((prev) => {
+      const maxH = Math.round(window.innerHeight * 0.75);
+      const next = Math.max(38, Math.min(maxH, prev - deltaY));
+      localStorage.setItem('mav_inspector_h', String(next));
+      return next;
+    });
+  };
+
+  const handleSetHeightPreset = (preset: 'min' | 'default' | 'max') => {
+    let next = 230;
+    if (preset === 'min') next = 38;
+    else if (preset === 'max') next = Math.min(520, Math.round(window.innerHeight * 0.65));
+    else next = 230;
+    setInspectorHeight(next);
+    localStorage.setItem('mav_inspector_h', String(next));
+  };
 
   // Export Modal
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
@@ -486,19 +591,51 @@ export const App: React.FC = () => {
       />
 
       {/* 3. Main Dashboard Workspace */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-2 p-2 min-h-0 overflow-hidden">
-        {/* Left Column: 2D Leaflet Map (5 cols) */}
-        <div className="lg:col-span-5 h-full flex flex-col min-h-0">
+      <div
+        ref={dashboardRef}
+        className="flex-1 flex flex-col lg:flex-row gap-0 p-2 min-h-0 overflow-hidden"
+      >
+        {/* Left Column: 2D Leaflet Map */}
+        <div
+          style={isDesktop ? { width: `calc(${colWidths[0]}% - 8px)` } : undefined}
+          className="w-full lg:w-auto h-full flex flex-col min-h-0 min-w-[200px]"
+        >
           <MapView points={points} currentPoint={currentPoint} />
         </div>
 
-        {/* Center Column: Skyplot & SNR (3 cols) */}
-        <div className="lg:col-span-3 h-full flex flex-col min-h-0">
+        {/* Resizable Divider 1 (Map vs Skyplot) */}
+        <div className="hidden lg:block shrink-0 h-full">
+          <Splitter
+            direction="vertical"
+            onDrag={handleCol1Col2Drag}
+            onDoubleClick={handleResetCols}
+            title="拖曳調整地圖與星空圖寬度比例，雙擊重設"
+          />
+        </div>
+
+        {/* Center Column: Skyplot & SNR */}
+        <div
+          style={isDesktop ? { width: `calc(${colWidths[1]}% - 8px)` } : undefined}
+          className="w-full lg:w-auto h-full flex flex-col min-h-0 min-w-[200px]"
+        >
           <SkyplotChart satellites={satellites} />
         </div>
 
-        {/* Right Column: CEP Measurement (4 cols) */}
-        <div className="lg:col-span-4 h-full flex flex-col min-h-0">
+        {/* Resizable Divider 2 (Skyplot vs CEP) */}
+        <div className="hidden lg:block shrink-0 h-full">
+          <Splitter
+            direction="vertical"
+            onDrag={handleCol2Col3Drag}
+            onDoubleClick={handleResetCols}
+            title="拖曳調整星空圖與CEP寬度比例，雙擊重設"
+          />
+        </div>
+
+        {/* Right Column: CEP Measurement */}
+        <div
+          style={isDesktop ? { width: `calc(${colWidths[2]}% - 0px)` } : undefined}
+          className="w-full lg:w-auto h-full flex flex-col min-h-0 min-w-[200px]"
+        >
           <CepChart
             points={points}
             cepStats={cepStats}
@@ -509,9 +646,27 @@ export const App: React.FC = () => {
         </div>
       </div>
 
+      {/* Resizable Horizontal Divider between Workspace & Bottom Inspector */}
+      <div className="px-2 shrink-0">
+        <Splitter
+          direction="horizontal"
+          onDrag={handleInspectorDrag}
+          onDoubleClick={() => handleSetHeightPreset('default')}
+          title="拖曳調整下方訊息檢查器高度，雙擊恢復預設高度"
+        />
+      </div>
+
       {/* 4. Bottom Message Inspector Bar */}
-      <div className="h-44 shrink-0 border-t border-cyber-border px-2 pb-2">
-        <MessageInspector latestPackets={latestPackets} statusLogs={statusLogs} />
+      <div
+        style={{ height: `${inspectorHeight}px` }}
+        className="shrink-0 px-2 pb-2 min-h-[38px] transition-all duration-75"
+      >
+        <MessageInspector
+          latestPackets={latestPackets}
+          statusLogs={statusLogs}
+          isCollapsed={inspectorHeight <= 42}
+          onSetHeightPreset={handleSetHeightPreset}
+        />
       </div>
 
       {/* 5. Export Dialog */}

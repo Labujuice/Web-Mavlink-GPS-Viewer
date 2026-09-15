@@ -1,19 +1,37 @@
 import React, { useState } from 'react';
 import { DecodedMavPacket } from '../types/mavlink';
-import { ListTree, Terminal, ChevronRight, ChevronDown } from 'lucide-react';
+import { ListTree, Terminal, ChevronRight, ChevronDown, Minimize2, Maximize2, Square } from 'lucide-react';
+import { Splitter } from './Splitter';
 
 interface MessageInspectorProps {
   latestPackets: Record<number, DecodedMavPacket>;
   statusLogs: { timestamp: number; text: string; severity: number }[];
+  isCollapsed?: boolean;
+  onSetHeightPreset?: (preset: 'min' | 'default' | 'max') => void;
 }
 
 export const MessageInspector: React.FC<MessageInspectorProps> = ({
   latestPackets,
   statusLogs,
+  isCollapsed = false,
+  onSetHeightPreset,
 }) => {
   const [activeTab, setActiveTab] = useState<'inspector' | 'logs'>('inspector');
   const [selectedMsgId, setSelectedMsgId] = useState<number>(24);
   const [expandedFields, setExpandedFields] = useState<Record<string, boolean>>({});
+
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('mav_inspector_sidebar_w');
+    return saved ? Number(saved) : 220;
+  });
+
+  const handleSidebarDrag = (delta: number) => {
+    setSidebarWidth((prev) => {
+      const next = Math.max(140, Math.min(500, prev + delta));
+      localStorage.setItem('mav_inspector_sidebar_w', String(next));
+      return next;
+    });
+  };
 
   const toggleField = (key: string) => {
     setExpandedFields((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -136,21 +154,57 @@ export const MessageInspector: React.FC<MessageInspectorProps> = ({
           </button>
         </div>
 
-        {activeTab === 'inspector' && currentPacket && (
-          <div className="text-[10px] text-cyber-muted font-mono">
-            SYS: {currentPacket.sysId} | COMP: {currentPacket.compId} | SEQ: {currentPacket.seq} |
-            TIME: {new Date(currentPacket.timestamp).toLocaleTimeString()}
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {activeTab === 'inspector' && currentPacket && (
+            <div className="text-[10px] text-cyber-muted font-mono hidden sm:block">
+              SYS: {currentPacket.sysId} | COMP: {currentPacket.compId} | SEQ: {currentPacket.seq} |
+              TIME: {new Date(currentPacket.timestamp).toLocaleTimeString()}
+            </div>
+          )}
+
+          {onSetHeightPreset && (
+            <div className="flex items-center gap-1 border-l border-cyber-border/80 pl-2">
+              <button
+                onClick={() => onSetHeightPreset('min')}
+                className={`p-1 border text-[10px] transition-colors ${
+                  isCollapsed
+                    ? 'border-cyber-line text-cyber-line bg-cyber-line/20'
+                    : 'border-cyber-border text-cyber-muted hover:text-cyber-line hover:border-cyber-line'
+                }`}
+                title="最小化收起 (底欄高度 38px)"
+              >
+                <Minimize2 className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => onSetHeightPreset('default')}
+                className="p-1 border border-cyber-border text-cyber-muted hover:text-cyber-line hover:border-cyber-line text-[10px] transition-colors"
+                title="標準高度 (240px)"
+              >
+                <Square className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => onSetHeightPreset('max')}
+                className="p-1 border border-cyber-border text-cyber-muted hover:text-cyber-line hover:border-cyber-line text-[10px] transition-colors"
+                title="最大化高度 (460px)"
+              >
+                <Maximize2 className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Tab 1: GPS Messages Field Inspector */}
       {activeTab === 'inspector' && (
-        <div className="flex-1 flex flex-col md:flex-row overflow-hidden font-mono">
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden font-mono min-h-0">
           {/* Left Message Type List */}
-          <div className="w-full md:w-56 border-r border-cyber-border bg-black/50 overflow-y-auto shrink-0">
-            <div className="p-1.5 text-[10px] text-cyber-muted uppercase border-b border-cyber-border">
-              SELECT GPS MSG
+          <div
+            style={{ width: `${sidebarWidth}px` }}
+            className="w-full md:w-auto border-r border-cyber-border bg-black/50 overflow-y-auto shrink-0"
+          >
+            <div className="p-1.5 text-[10px] text-cyber-muted uppercase border-b border-cyber-border flex justify-between items-center">
+              <span>SELECT GPS MSG</span>
+              <span className="text-[9px] text-cyber-dim">可拉動寬度</span>
             </div>
             {knownMessages.map((m) => {
               const pkt = latestPackets[m.id];
@@ -177,6 +231,19 @@ export const MessageInspector: React.FC<MessageInspectorProps> = ({
                 </button>
               );
             })}
+          </div>
+
+          {/* Resizable Divider between Left List and Right Table */}
+          <div className="hidden md:block shrink-0 h-full">
+            <Splitter
+              direction="vertical"
+              onDrag={handleSidebarDrag}
+              onDoubleClick={() => {
+                setSidebarWidth(220);
+                localStorage.setItem('mav_inspector_sidebar_w', '220');
+              }}
+              title="拖曳調整訊息清單與資料表格寬度，雙擊重設"
+            />
           </div>
 
           {/* Right Field Inspector Table */}
