@@ -8,6 +8,50 @@ export interface SerialPortItem {
   usbProductId?: number;
 }
 
+export interface SerialDiagnostic {
+  ok: boolean;
+  reason?: string;
+  isProtocolFile?: boolean;
+  isInsecureContext?: boolean;
+}
+
+export function getSerialDiagnostic(): SerialDiagnostic {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+    return { ok: false, reason: '非瀏覽器執行環境。' };
+  }
+
+  // 1. Check file:// protocol
+  if (window.location.protocol === 'file:') {
+    return {
+      ok: false,
+      isProtocolFile: true,
+      reason:
+        '檢測到當前以「file://」協議直接開啟檔案。Google Chrome 基於資安規範，禁止在本地 file:// 下使用 Web Serial API！請在終端機執行「npm run preview」或「npm run dev」，並以瀏覽器打開「http://localhost:4173」或「http://localhost:5173」。',
+    };
+  }
+
+  // 2. Check Secure Context (must be localhost or https)
+  if (!window.isSecureContext) {
+    return {
+      ok: false,
+      isInsecureContext: true,
+      reason:
+        '當前網頁處於非安全上下文 (Insecure Context)。Web Serial API 要求必須透過「http://localhost」或「https://」加密連線存取。',
+    };
+  }
+
+  // 3. Check navigator.serial
+  if (!('serial' in navigator)) {
+    return {
+      ok: false,
+      reason:
+        '當前瀏覽器核心不支援 Web Serial API。請確認使用 Google Chrome、Microsoft Edge 或 Opera/Brave (Chrome 89+)，且未開啟特殊隱私阻擋模式。',
+    };
+  }
+
+  return { ok: true };
+}
+
 // Device naming helper for common Flight Controller / GNSS UART adapters
 function identifyUsbDevice(vid?: number, pid?: number): string {
   if (!vid) return 'Serial Port (Standard UART)';
@@ -56,7 +100,7 @@ export class WebSerialService {
   }
 
   public static isSupported(): boolean {
-    return typeof navigator !== 'undefined' && 'serial' in navigator;
+    return getSerialDiagnostic().ok;
   }
 
   public isConnected(): boolean {
@@ -92,8 +136,9 @@ export class WebSerialService {
    * Request user to pick a serial port from OS device list (e.g. /dev/ttyUSB0, COM3)
    */
   public async requestNewPort(): Promise<SerialPortItem | null> {
-    if (!WebSerialService.isSupported()) {
-      throw new Error('Web Serial API 在此瀏覽器不被支援，請使用 Chrome 或 Edge 瀏覽器。');
+    const diag = getSerialDiagnostic();
+    if (!diag.ok) {
+      throw new Error(diag.reason || 'Web Serial API 目前在此環境下無法啟用。');
     }
 
     try {
@@ -133,7 +178,12 @@ export class WebSerialService {
       return true;
     } catch (err: any) {
       this.disconnect();
-      if (this.onErrorCallback) this.onErrorCallback(err);
+      const errMsg = err.message || String(err);
+      let friendlyError = `串口連線失敗: ${errMsg}`;
+      if (errMsg.includes('Failed to open') || errMsg.includes('Permission')) {
+        friendlyError += '\n(Linux 提示：請確認是否隸屬 dialout 群組「sudo usermod -aG dialout $USER」或串口是否被其他地面站/終端軟體佔用)';
+      }
+      if (this.onErrorCallback) this.onErrorCallback(new Error(friendlyError));
       return false;
     }
   }

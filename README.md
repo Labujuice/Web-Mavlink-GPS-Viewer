@@ -70,22 +70,23 @@
 npm install
 ```
 
-### 3. 啟動本地開發伺服器
+### 3. 啟動本地開發伺服器 (已內建自動 HTTPS)
 ```bash
 npm run dev
 ```
-啟動後在 Chrome、Edge 或 Chromium 核心瀏覽器中開啟 `http://localhost:5173`。
-> **提示**：Web Serial API 僅在 `localhost` 或具備 `https://` 安全上下文的環境中支援。
+啟動後終端機將提供 HTTPS 加密網址：
+- 本機訪問：`https://localhost:5173/`
+- 區域網路訪問：`https://<你的IP>:5173/`
 
-### 4. 編譯為生產環境靜態檔案
+> **🔐 HTTPS 憑證說明**：
+> 專案已配置 `@vitejs/plugin-basic-ssl` 自動生成本機 HTTPS 憑證。第一次開啟時，Chrome 會提示「您的連線不是私人連線」，請點選 **「進階 (Advanced)」$\to$「繼續前往 (Proceed)」** 即可進入。進入後即為標準 **Secure Context (安全上下文)**，Web Serial API 即可正常使用。
+
+### 4. 編譯與預覽生產環境 (亦支援 HTTPS)
 ```bash
 npm run build
-```
-編譯完成後，產出的純靜態網頁檔案將位於 **`dist/`** 目錄中。
-可透過以下指令在本地預覽編譯結果：
-```bash
 npm run preview
 ```
+啟動後將於 `https://localhost:4173/` 提供已編譯之靜態網頁預覽。
 
 ---
 

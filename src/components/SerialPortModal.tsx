@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SerialPortItem, WebSerialService } from '../services/serial';
+import { SerialPortItem, getSerialDiagnostic } from '../services/serial';
 import { X, Cpu, RefreshCw, Plus, Check, AlertCircle, Usb } from 'lucide-react';
 
 interface SerialPortModalProps {
@@ -32,7 +32,7 @@ export const SerialPortModal: React.FC<SerialPortModalProps> = ({
   onDisconnect,
 }) => {
   const [isScanning, setIsScanning] = useState<boolean>(false);
-  const isSupported = WebSerialService.isSupported();
+  const diag = getSerialDiagnostic();
   const baudRates = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
 
   useEffect(() => {
@@ -64,14 +64,31 @@ export const SerialPortModal: React.FC<SerialPortModalProps> = ({
         </div>
 
         {/* Compatibility Check */}
-        {!isSupported ? (
-          <div className="mb-4 border border-red-800 bg-red-950/30 p-3 text-xs text-red-400 flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+        {!diag.ok ? (
+          <div className="mb-4 border border-red-800 bg-red-950/40 p-3 text-xs text-red-300 flex items-start gap-2.5">
+            <AlertCircle className="w-5 h-5 shrink-0 text-red-400 mt-0.5" />
             <div>
-              <div className="font-bold">瀏覽器不支援 Web Serial API</div>
-              <div className="text-[11px] text-red-300 mt-1">
-                當前瀏覽器不具備原生串口存取權限。請在 <strong>Google Chrome</strong>、<strong>Microsoft Edge</strong> 或 <strong>Opera/Brave</strong>（在 Linux、Windows 或 macOS）中開啟本頁面，並確保處於 <code>localhost</code> 或 <code>https://</code> 安全連線環境。
+              <div className="font-bold text-red-400 mb-1">
+                {diag.isProtocolFile
+                  ? '⚠️ 禁止在 file:// 協議直接開啟'
+                  : diag.isInsecureContext
+                  ? '⚠️ 非安全上下文 (需要 localhost 或 https)'
+                  : '⚠️ 瀏覽器尚未啟用 Web Serial API'}
               </div>
+              <div className="text-[11px] leading-relaxed text-red-200">
+                {diag.reason}
+              </div>
+              {diag.isProtocolFile && (
+                <div className="mt-2 p-2 bg-black/70 border border-red-900 text-[11px] font-mono text-cyber-line">
+                  <strong>快速解決方法：</strong>
+                  <br />
+                  在專案目錄終端機執行：
+                  <div className="bg-neutral-900 px-2 py-1 my-1 text-white select-all">
+                    npm run preview
+                  </div>
+                  然後以 Chrome 瀏覽器打開顯示的網址（如 <strong>http://localhost:4173</strong>）。
+                </div>
+              )}
             </div>
           </div>
         ) : (

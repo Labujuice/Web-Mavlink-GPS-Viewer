@@ -9,8 +9,9 @@ import { ExportModal } from './components/ExportModal';
 import { SerialPortModal } from './components/SerialPortModal';
 
 import { MavlinkDecoder } from './mavlink/decoder';
-import { WebSerialService, SerialPortItem } from './services/serial';
+import { WebSerialService, SerialPortItem, getSerialDiagnostic } from './services/serial';
 import { LogReplayService } from './services/logReplay';
+import { AlertTriangle } from 'lucide-react';
 import { GpsSimulator, SimulatorMode } from './services/simulator';
 import {
   TrajectoryPoint,
@@ -356,6 +357,22 @@ export const App: React.FC = () => {
         rxPacketCount={rxPacketCount}
         isRxActive={isRxActive}
       />
+
+      {/* Serial Diagnostic Warning Banner */}
+      {sourceType === 'serial' && !getSerialDiagnostic().ok && (
+        <div className="bg-red-950/80 border-b border-red-800 px-4 py-2 text-xs flex items-center justify-between font-mono text-red-300">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+            <span>{getSerialDiagnostic().reason}</span>
+          </div>
+          <button
+            onClick={() => setIsSerialModalOpen(true)}
+            className="underline text-cyber-line text-[11px] shrink-0 ml-3 hover:text-white"
+          >
+            查看解決方案 &gt;
+          </button>
+        </div>
+      )}
 
       {/* 2. Top Telemetry Status Bar */}
       <TelemetryBar
