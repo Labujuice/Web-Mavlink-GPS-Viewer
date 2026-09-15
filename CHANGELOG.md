@@ -21,6 +21,12 @@
     - 內建常見晶片與飛控自動識別（Pixhawk STM32 VCP、Cube、CP210x、FTDI、CH340、u-blox GNSS 等）。
     - 具備專屬「COM 埠設定管理視窗 (`SerialPortModal`)」，支援設備重新整理、已配對列表與鮑率選擇。
     - 整合 `@vitejs/plugin-basic-ssl`，`dev` 與 `preview` 自動以 `https://` 啟動，符合 Chrome 安全上下文（Secure Context）要求。
+  - **MAVLink 串流頻率請求與指令下發 (SET_MESSAGE_INTERVAL)**：
+    - 新增 `src/mavlink/encoder.ts` 實現 `COMMAND_LONG` (#76) 封包編碼。
+    - 支援 `MAV_CMD_SET_MESSAGE_INTERVAL` (#511) 動態設定指定訊息頻率（Hz / 微秒間隔）。
+    - 支援 `MAV_CMD_REQUEST_MESSAGE` (#512) 執行單次 (1x) 封包即時採樣。
+    - 新增「串流頻率設定面板 (`MessageRateModal`)」，提供實測接收 Hz 即時反饋、自選 0Hz/1Hz/2Hz/5Hz/10Hz/20Hz 與自訂 Message ID。
+    - 提供「一鍵標準 GPS 頻率 (5Hz/1Hz)」、「高頻遙測 (10Hz)」與「全部停止 (0Hz)」快速按鈕。
   - **離線日誌重播**：支援拖曳載入 `.tlog`、`.bin`、`.csv`，具備播放/暫停、時間進度條與 1x/2x/5x/10x 倍速。
   - **GPS 模擬器**：內建靜態停放（含雜訊供測 CEP）、圓形航跡飛行與 RTK 狀態動態切換。
 - **視覺化儀表與圖表**：

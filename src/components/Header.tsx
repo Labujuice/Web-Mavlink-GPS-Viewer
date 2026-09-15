@@ -11,6 +11,7 @@ import {
   Zap,
   Settings,
   Usb,
+  Sliders,
 } from 'lucide-react';
 import { GpsFixType } from '../types/mavlink';
 import { SimulatorMode } from '../services/simulator';
@@ -49,6 +50,7 @@ interface HeaderProps {
   // General
   onResetData: () => void;
   onOpenExport: () => void;
+  onOpenRateModal: () => void;
   rxPacketCount: number;
   isRxActive: boolean;
 }
@@ -82,6 +84,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSimFixTypeChange,
   onResetData,
   onOpenExport,
+  onOpenRateModal,
   rxPacketCount,
   isRxActive,
 }) => {
@@ -325,6 +328,16 @@ export const Header: React.FC<HeaderProps> = ({
             RX: <span className="text-cyber-line font-bold">{rxPacketCount}</span>
           </span>
         </div>
+
+        {/* Message Rate Config Button */}
+        <button
+          onClick={onOpenRateModal}
+          title="設定 MAVLink 封包請求頻率 (Hz)"
+          className="px-2.5 py-1 text-xs border border-cyber-line text-cyber-line bg-cyber-dark hover:bg-cyber-line/20 transition-colors flex items-center gap-1.5"
+        >
+          <Sliders className="w-3.5 h-3.5" />
+          MSG RATE
+        </button>
 
         {/* Export Button */}
         <button

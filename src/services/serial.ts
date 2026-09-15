@@ -240,4 +240,20 @@ export class WebSerialService {
       this.onDisconnectCallback();
     }
   }
+
+  /**
+   * Send binary data (MAVLink packets) out to the serial port
+   */
+  public async send(bytes: Uint8Array): Promise<void> {
+    if (!this.activePort || !this.activePort.writable) {
+      throw new Error('串口尚未連線或不支援寫入。');
+    }
+
+    const writer = this.activePort.writable.getWriter();
+    try {
+      await writer.write(bytes);
+    } finally {
+      writer.releaseLock();
+    }
+  }
 }

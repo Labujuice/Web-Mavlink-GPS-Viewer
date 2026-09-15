@@ -7,12 +7,14 @@ import { MapView } from './components/MapView';
 import { MessageInspector } from './components/MessageInspector';
 import { ExportModal } from './components/ExportModal';
 import { SerialPortModal } from './components/SerialPortModal';
+import { MessageRateModal } from './components/MessageRateModal';
 
 import { MavlinkDecoder } from './mavlink/decoder';
+import { encodeSetMessageInterval, encodeRequestMessage } from './mavlink/encoder';
 import { WebSerialService, SerialPortItem, getSerialDiagnostic } from './services/serial';
 import { LogReplayService } from './services/logReplay';
-import { AlertTriangle } from 'lucide-react';
 import { GpsSimulator, SimulatorMode } from './services/simulator';
+import { AlertTriangle } from 'lucide-react';
 import {
   TrajectoryPoint,
   SatelliteInfo,
@@ -32,6 +34,12 @@ export const App: React.FC = () => {
   const [pairedPorts, setPairedPorts] = useState<SerialPortItem[]>([]);
   const [selectedPort, setSelectedPort] = useState<SerialPortItem | null>(null);
   const [isSerialModalOpen, setIsSerialModalOpen] = useState<boolean>(false);
+
+  // Message Stream Rate State
+  const [isRateModalOpen, setIsRateModalOpen] = useState<boolean>(false);
+  const [measuredRates, setMeasuredRates] = useState<Record<number, number>>({});
+  const packetTimestampsRef = useRef<Record<number, number[]>>({});
+  const txSeqRef = useRef<number>(0);
 
   // Replay State
   const [replayPlaying, setReplayPlaying] = useState<boolean>(false);
@@ -76,8 +84,15 @@ export const App: React.FC = () => {
 
   // Handle Inbound Decoded MAVLink Packet
   const handlePacket = useCallback((packet: DecodedMavPacket) => {
+    const now = Date.now();
     setRxPacketCount((c) => c + 1);
     triggerRxPulse();
+
+    // Track arrival timestamp for Hz measurement
+    if (!packetTimestampsRef.current[packet.msgId]) {
+      packetTimestampsRef.current[packet.msgId] = [];
+    }
+    packetTimestampsRef.current[packet.msgId].push(now);
 
     setLatestPackets((prev) => ({ ...prev, [packet.msgId]: packet }));
 
@@ -157,6 +172,24 @@ export const App: React.FC = () => {
       }
     }
   }, [triggerRxPulse]);
+
+  // Periodic Rate (Hz) Calculation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const newRates: Record<number, number> = {};
+      for (const [msgIdStr, timestamps] of Object.entries(packetTimestampsRef.current)) {
+        const id = Number(msgIdStr);
+        // Keep timestamps in the last 2.0 seconds
+        const valid = timestamps.filter((t) => now - t <= 2000);
+        packetTimestampsRef.current[id] = valid;
+        newRates[id] = valid.length / 2.0;
+      }
+      setMeasuredRates(newRates);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Refresh Paired Serial Ports
   const refreshPairedPorts = useCallback(async () => {
@@ -241,6 +274,73 @@ export const App: React.FC = () => {
     setSerialConnected(false);
   };
 
+  // Send MAV_CMD_SET_MESSAGE_INTERVAL to Autopilot
+  const handleSetMessageInterval = async (
+    msgId: number,
+    hz: number,
+    targetSys: number = 1,
+    targetComp: number = 1
+  ): Promise<boolean> => {
+    try {
+      const packet = encodeSetMessageInterval(msgId, hz, txSeqRef.current++, targetSys, targetComp);
+      if (serialServiceRef.current?.isConnected()) {
+        await serialServiceRef.current.send(packet);
+        setStatusLogs((prev) => [
+          {
+            timestamp: Date.now(),
+            text: `[TX CMD] SET_MESSAGE_INTERVAL: Msg #${msgId} -> ${hz} Hz (${hz > 0 ? Math.round(1000000 / hz) + 'us' : 'OFF'})`,
+            severity: 6,
+          },
+          ...prev.slice(0, 99),
+        ]);
+        return true;
+      } else {
+        alert('串口尚未連線，無法發送 MAVLink 頻率請求。請先點擊 CONNECT 連線至飛控。');
+        return false;
+      }
+    } catch (e: any) {
+      alert(`發送指令失敗: ${e.message}`);
+      return false;
+    }
+  };
+
+  // Send MAV_CMD_REQUEST_MESSAGE (One-shot)
+  const handleRequestOnce = async (
+    msgId: number,
+    targetSys: number = 1,
+    targetComp: number = 1
+  ): Promise<boolean> => {
+    try {
+      const packet = encodeRequestMessage(msgId, txSeqRef.current++, targetSys, targetComp);
+      if (serialServiceRef.current?.isConnected()) {
+        await serialServiceRef.current.send(packet);
+        setStatusLogs((prev) => [
+          {
+            timestamp: Date.now(),
+            text: `[TX CMD] REQUEST_MESSAGE: Msg #${msgId} (One-shot)`,
+            severity: 6,
+          },
+          ...prev.slice(0, 99),
+        ]);
+        return true;
+      } else {
+        alert('串口尚未連線，無法發送 MAVLink 指令。');
+        return false;
+      }
+    } catch (e: any) {
+      alert(`發送指令失敗: ${e.message}`);
+      return false;
+    }
+  };
+
+  // Batch Request
+  const handleBatchSetRates = async (configs: { msgId: number; hz: number }[]) => {
+    for (const cfg of configs) {
+      await handleSetMessageInterval(cfg.msgId, cfg.hz);
+      await new Promise((r) => setTimeout(r, 50)); // small delay
+    }
+  };
+
   // Replay Controls
   const handleFileUpload = (file: File) => {
     const reader = new FileReader();
@@ -305,6 +405,8 @@ export const App: React.FC = () => {
     setLatestPackets({});
     setStatusLogs([]);
     setRxPacketCount(0);
+    packetTimestampsRef.current = {};
+    setMeasuredRates({});
   };
 
   const handleResetCep = () => {
@@ -338,6 +440,7 @@ export const App: React.FC = () => {
         onSelectPort={setSelectedPort}
         onRequestNewPort={handleRequestNewPort}
         onOpenPortModal={() => setIsSerialModalOpen(true)}
+        onOpenRateModal={() => setIsRateModalOpen(true)}
         replayPlaying={replayPlaying}
         replayProgress={replayProgress}
         onReplayPlay={handleReplayPlay}
@@ -432,6 +535,17 @@ export const App: React.FC = () => {
         isConnected={serialConnected}
         onConnect={handleSerialConnect}
         onDisconnect={handleSerialDisconnect}
+      />
+
+      {/* 7. Message Stream Rate Configuration Dialog */}
+      <MessageRateModal
+        isOpen={isRateModalOpen}
+        onClose={() => setIsRateModalOpen(false)}
+        rates={measuredRates}
+        onSetRate={handleSetMessageInterval}
+        onRequestOnce={handleRequestOnce}
+        onBatchSetRates={handleBatchSetRates}
+        isConnected={serialConnected}
       />
     </div>
   );
