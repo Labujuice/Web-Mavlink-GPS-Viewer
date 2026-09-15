@@ -6,9 +6,10 @@ import { CepChart } from './components/CepChart';
 import { MapView } from './components/MapView';
 import { MessageInspector } from './components/MessageInspector';
 import { ExportModal } from './components/ExportModal';
+import { SerialPortModal } from './components/SerialPortModal';
 
 import { MavlinkDecoder } from './mavlink/decoder';
-import { WebSerialService } from './services/serial';
+import { WebSerialService, SerialPortItem } from './services/serial';
 import { LogReplayService } from './services/logReplay';
 import { GpsSimulator, SimulatorMode } from './services/simulator';
 import {
@@ -27,6 +28,9 @@ export const App: React.FC = () => {
   const [sourceType, setSourceType] = useState<'serial' | 'replay' | 'sim'>('sim');
   const [serialConnected, setSerialConnected] = useState<boolean>(false);
   const [serialBaud, setSerialBaud] = useState<number>(115200);
+  const [pairedPorts, setPairedPorts] = useState<SerialPortItem[]>([]);
+  const [selectedPort, setSelectedPort] = useState<SerialPortItem | null>(null);
+  const [isSerialModalOpen, setIsSerialModalOpen] = useState<boolean>(false);
 
   // Replay State
   const [replayPlaying, setReplayPlaying] = useState<boolean>(false);
@@ -153,6 +157,31 @@ export const App: React.FC = () => {
     }
   }, [triggerRxPulse]);
 
+  // Refresh Paired Serial Ports
+  const refreshPairedPorts = useCallback(async () => {
+    if (serialServiceRef.current) {
+      const ports = await serialServiceRef.current.getPairedPorts();
+      setPairedPorts(ports);
+      if (ports.length > 0) {
+        setSelectedPort((curr) => curr || ports[0]);
+      }
+    }
+  }, []);
+
+  // Request new port via browser native device picker
+  const handleRequestNewPort = async () => {
+    if (!serialServiceRef.current) return;
+    try {
+      const newPort = await serialServiceRef.current.requestNewPort();
+      if (newPort) {
+        setPairedPorts((prev) => [newPort, ...prev.filter((p) => p.id !== newPort.id)]);
+        setSelectedPort(newPort);
+      }
+    } catch (e: any) {
+      alert(e.message);
+    }
+  };
+
   // Initialize Decoder & Services
   useEffect(() => {
     decoderRef.current.onPacket = handlePacket;
@@ -163,6 +192,8 @@ export const App: React.FC = () => {
       (err) => alert(`串口連線錯誤: ${err.message}`),
       () => setSerialConnected(false)
     );
+
+    refreshPairedPorts();
 
     // Log Replay
     replayServiceRef.current = new LogReplayService(
@@ -179,13 +210,25 @@ export const App: React.FC = () => {
       replayServiceRef.current?.pause();
       simulatorRef.current?.stop();
     };
-  }, [handlePacket]);
+  }, [handlePacket, refreshPairedPorts]);
 
   // Serial Connect / Disconnect
-  const handleSerialConnect = async (baud: number) => {
+  const handleSerialConnect = async () => {
     if (!serialServiceRef.current) return;
+
+    let targetPort = selectedPort;
+    if (!targetPort) {
+      targetPort = await serialServiceRef.current.requestNewPort();
+      if (targetPort) {
+        setPairedPorts((prev) => [targetPort!, ...prev.filter((p) => p.id !== targetPort!.id)]);
+        setSelectedPort(targetPort);
+      } else {
+        return;
+      }
+    }
+
     try {
-      const ok = await serialServiceRef.current.connect(baud);
+      const ok = await serialServiceRef.current.connect(targetPort.port, serialBaud);
       setSerialConnected(ok);
     } catch (e: any) {
       alert(e.message);
@@ -279,7 +322,6 @@ export const App: React.FC = () => {
         sourceType={sourceType}
         setSourceType={(t) => {
           setSourceType(t);
-          // Pause simulator if switching away
           if (t !== 'sim' && simRunning) {
             simulatorRef.current?.stop();
             setSimRunning(false);
@@ -290,6 +332,11 @@ export const App: React.FC = () => {
         onSerialDisconnect={handleSerialDisconnect}
         serialBaud={serialBaud}
         setSerialBaud={setSerialBaud}
+        pairedPorts={pairedPorts}
+        selectedPort={selectedPort}
+        onSelectPort={setSelectedPort}
+        onRequestNewPort={handleRequestNewPort}
+        onOpenPortModal={() => setIsSerialModalOpen(true)}
         replayPlaying={replayPlaying}
         replayProgress={replayProgress}
         onReplayPlay={handleReplayPlay}
@@ -325,12 +372,12 @@ export const App: React.FC = () => {
           <MapView points={points} currentPoint={currentPoint} />
         </div>
 
-        {/* Center Column: Skyplot & SNR (3.5 cols) */}
+        {/* Center Column: Skyplot & SNR (3 cols) */}
         <div className="lg:col-span-3 h-full flex flex-col min-h-0">
           <SkyplotChart satellites={satellites} />
         </div>
 
-        {/* Right Column: CEP Measurement (3.5 cols) */}
+        {/* Right Column: CEP Measurement (4 cols) */}
         <div className="lg:col-span-4 h-full flex flex-col min-h-0">
           <CepChart
             points={points}
@@ -342,7 +389,7 @@ export const App: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. Bottom Message Inspector Bar (Collapsible / Full Field Inspection) */}
+      {/* 4. Bottom Message Inspector Bar */}
       <div className="h-44 shrink-0 border-t border-cyber-border px-2 pb-2">
         <MessageInspector latestPackets={latestPackets} statusLogs={statusLogs} />
       </div>
@@ -352,6 +399,22 @@ export const App: React.FC = () => {
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
         points={points}
+      />
+
+      {/* 6. Serial / COM Port Management Dialog */}
+      <SerialPortModal
+        isOpen={isSerialModalOpen}
+        onClose={() => setIsSerialModalOpen(false)}
+        pairedPorts={pairedPorts}
+        selectedPort={selectedPort}
+        onSelectPort={setSelectedPort}
+        onRequestNewPort={handleRequestNewPort}
+        onRefreshPorts={refreshPairedPorts}
+        serialBaud={serialBaud}
+        setSerialBaud={setSerialBaud}
+        isConnected={serialConnected}
+        onConnect={handleSerialConnect}
+        onDisconnect={handleSerialDisconnect}
       />
     </div>
   );

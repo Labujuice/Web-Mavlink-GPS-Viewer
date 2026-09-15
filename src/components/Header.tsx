@@ -9,19 +9,27 @@ import {
   Download,
   Activity,
   Zap,
+  Settings,
+  Usb,
 } from 'lucide-react';
 import { GpsFixType } from '../types/mavlink';
 import { SimulatorMode } from '../services/simulator';
+import { SerialPortItem } from '../services/serial';
 
 interface HeaderProps {
   sourceType: 'serial' | 'replay' | 'sim';
   setSourceType: (type: 'serial' | 'replay' | 'sim') => void;
   // Serial
   serialConnected: boolean;
-  onSerialConnect: (baudRate: number) => void;
+  onSerialConnect: () => void;
   onSerialDisconnect: () => void;
   serialBaud: number;
   setSerialBaud: (baud: number) => void;
+  pairedPorts: SerialPortItem[];
+  selectedPort: SerialPortItem | null;
+  onSelectPort: (port: SerialPortItem) => void;
+  onRequestNewPort: () => Promise<void>;
+  onOpenPortModal: () => void;
   // Replay
   replayPlaying: boolean;
   replayProgress: number;
@@ -53,6 +61,11 @@ export const Header: React.FC<HeaderProps> = ({
   onSerialDisconnect,
   serialBaud,
   setSerialBaud,
+  pairedPorts,
+  selectedPort,
+  onSelectPort,
+  onRequestNewPort,
+  onOpenPortModal,
   replayPlaying,
   replayProgress,
   onReplayPlay,
@@ -140,6 +153,48 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Source-specific Sub-controls */}
         {sourceType === 'serial' && (
           <div className="flex items-center gap-2">
+            {/* COM Port Selector Dropdown / Button */}
+            <div className="flex items-center">
+              {pairedPorts.length > 0 ? (
+                <select
+                  value={selectedPort?.id || ''}
+                  onChange={(e) => {
+                    const found = pairedPorts.find((p) => p.id === e.target.value);
+                    if (found) onSelectPort(found);
+                  }}
+                  disabled={serialConnected}
+                  className="bg-black text-cyber-line border border-cyber-border px-2 py-0.5 text-xs focus:outline-none focus:border-cyber-line cursor-pointer max-w-[200px] truncate"
+                  title="選擇已授權之 COM Port"
+                >
+                  {pairedPorts.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.displayName}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <button
+                  onClick={onRequestNewPort}
+                  disabled={serialConnected}
+                  className="bg-black text-cyber-muted hover:text-cyber-line border border-cyber-border hover:border-cyber-line px-2 py-0.5 text-xs flex items-center gap-1 transition-colors"
+                  title="新增或選取系統串口 (/dev/ttyUSB0, COM3...)"
+                >
+                  <Usb className="w-3 h-3 text-cyber-line" />
+                  <span>+ 選取 COM 埠</span>
+                </button>
+              )}
+
+              {/* Port Manager Modal Button */}
+              <button
+                onClick={onOpenPortModal}
+                className="p-1 border border-l-0 border-cyber-border hover:border-cyber-line text-cyber-muted hover:text-cyber-line bg-black"
+                title="開啟 COM 埠設定視窗"
+              >
+                <Settings className="w-3 h-3" />
+              </button>
+            </div>
+
+            {/* Baud Rate Selector */}
             <select
               value={serialBaud}
               onChange={(e) => setSerialBaud(Number(e.target.value))}
@@ -152,6 +207,8 @@ export const Header: React.FC<HeaderProps> = ({
                 </option>
               ))}
             </select>
+
+            {/* Connect / Disconnect Action */}
             {serialConnected ? (
               <button
                 onClick={onSerialDisconnect}
@@ -161,11 +218,11 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             ) : (
               <button
-                onClick={() => onSerialConnect(serialBaud)}
+                onClick={onSerialConnect}
                 className="bg-cyber-line/10 text-cyber-line border border-cyber-line hover:bg-cyber-line/20 px-2.5 py-0.5 text-xs font-bold transition-colors flex items-center gap-1"
               >
                 <Zap className="w-3 h-3" />
-                CONNECT PORT
+                CONNECT
               </button>
             )}
           </div>

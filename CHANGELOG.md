@@ -15,7 +15,11 @@
   - CRC-16 (X.25) 封包驗證與 CRC_EXTRA 常數表。
   - 完整支援所有 GPS 相關訊息：`GPS_RAW_INT` (#24)、`GPS_STATUS` (#25)、`GLOBAL_POSITION_INT` (#33)、`GPS2_RAW` (#124)、`GPS_RTK` (#127)、`GPS2_RTK` (#128)、`GPS_INPUT` (#232)、`HIL_GPS` (#113)、`STATUSTEXT` (#253)。
 - **資料輸入通道**：
-  - **Web Serial API**：前端原生直連 `/dev/ttyUSB*`、`/dev/ttyACM*`、`COM` 串口，支援多種波特率與 RX 活動指示燈。
+  - **Web Serial API 原生串口連線與 COM 選擇介面**：
+    - 新增直觀的 COM Port 選擇下拉選單與「+ 選取 COM 埠」按鈕。
+    - 支援原生呼叫系統裝置選單（`/dev/ttyUSB*`、`/dev/ttyACM*`、Windows `COM1~COM32`）。
+    - 內建常見晶片與飛控自動識別（Pixhawk STM32 VCP、Cube、CP210x、FTDI、CH340、u-blox GNSS 等）。
+    - 具備專屬「COM 埠設定管理視窗 (`SerialPortModal`)」，支援設備重新整理、已配對列表與鮑率選擇。
   - **離線日誌重播**：支援拖曳載入 `.tlog`、`.bin`、`.csv`，具備播放/暫停、時間進度條與 1x/2x/5x/10x 倍速。
   - **GPS 模擬器**：內建靜態停放（含雜訊供測 CEP）、圓形航跡飛行與 RTK 狀態動態切換。
 - **視覺化儀表與圖表**：
