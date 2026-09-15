@@ -110,3 +110,44 @@ export function encodeRequestMessage(
   const params = [msgId, 0, 0, 0, 0, 0, 0];
   return encodeCommandLong(512, params, seq, targetSys, targetComp);
 }
+
+/**
+ * Encode GCS HEARTBEAT (#0)
+ * Sends standard 1Hz Ground Control Station heartbeat to keep connection alive
+ */
+export function encodeHeartbeat(
+  seq: number = 0,
+  sysId: number = 255,
+  compId: number = 190
+): Uint8Array {
+  const payload = new Uint8Array(9);
+  const view = new DataView(payload.buffer);
+  view.setUint32(0, 0, true); // custom_mode
+  view.setUint8(4, 6);        // type: MAV_TYPE_GCS
+  view.setUint8(5, 8);        // autopilot: MAV_AUTOPILOT_INVALID
+  view.setUint8(6, 0);        // base_mode
+  view.setUint8(7, 4);        // system_status: MAV_STATE_ACTIVE
+  view.setUint8(8, 3);        // mavlink_version
+  return encodeMavlinkV1Packet(0, payload, seq, sysId, compId);
+}
+
+/**
+ * Encode REQUEST_DATA_STREAM (#66) for legacy / stream-group requests
+ */
+export function encodeRequestDataStream(
+  streamId: number,
+  rateHz: number,
+  startStop: number = 1,
+  seq: number = 0,
+  targetSys: number = 1,
+  targetComp: number = 1
+): Uint8Array {
+  const payload = new Uint8Array(6);
+  const view = new DataView(payload.buffer);
+  view.setUint16(0, rateHz, true);
+  view.setUint8(2, targetSys);
+  view.setUint8(3, targetComp);
+  view.setUint8(4, streamId);
+  view.setUint8(5, startStop);
+  return encodeMavlinkV1Packet(66, payload, seq);
+}

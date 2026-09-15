@@ -5,6 +5,7 @@ import {
   decodeGlobalPositionInt,
   decodeGpsRtk,
   decodeStatusText,
+  decodeCommandAck,
 } from './messages';
 import { DecodedMavPacket } from '../types/mavlink';
 
@@ -155,6 +156,9 @@ export class MavlinkDecoder {
         break;
       case 253: // STATUSTEXT
         decodedPayload = decodeStatusText(payloadBytes);
+        break;
+      case 77: // COMMAND_ACK
+        decodedPayload = decodeCommandAck(payloadBytes);
         break;
       default:
         // Raw bytes payload

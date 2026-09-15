@@ -11,7 +11,7 @@ import { MessageRateModal } from './components/MessageRateModal';
 import { Splitter } from './components/Splitter';
 
 import { MavlinkDecoder } from './mavlink/decoder';
-import { encodeSetMessageInterval, encodeRequestMessage } from './mavlink/encoder';
+import { encodeSetMessageInterval, encodeRequestMessage, encodeHeartbeat } from './mavlink/encoder';
 import { WebSerialService, SerialPortItem, getSerialDiagnostic } from './services/serial';
 import { LogReplayService } from './services/logReplay';
 import { GpsSimulator, SimulatorMode } from './services/simulator';
@@ -24,6 +24,8 @@ import {
   GpsRtkMsg,
   DecodedMavPacket,
   GpsFixType,
+  CommandAckMsg,
+  MavResult,
 } from './types/mavlink';
 import { calculateCepStats } from './utils/geo';
 
@@ -41,6 +43,9 @@ export const App: React.FC = () => {
   const [measuredRates, setMeasuredRates] = useState<Record<number, number>>({});
   const packetTimestampsRef = useRef<Record<number, number[]>>({});
   const txSeqRef = useRef<number>(0);
+  const [detectedSysId, setDetectedSysId] = useState<number>(1);
+  const [detectedCompId, setDetectedCompId] = useState<number>(1);
+  const pendingAckWaitersRef = useRef<Record<number, (ack: CommandAckMsg) => void>>({});
 
   // Replay State
   const [replayPlaying, setReplayPlaying] = useState<boolean>(false);
@@ -266,6 +271,14 @@ export const App: React.FC = () => {
       setGpsRtk(packet.payload as GpsRtkMsg);
     }
 
+    // Auto-detect Target System ID & Component ID from vehicle packets
+    if (packet.sysId > 0 && packet.sysId !== 255) {
+      setDetectedSysId(packet.sysId);
+      if (packet.compId > 0) {
+        setDetectedCompId(packet.compId);
+      }
+    }
+
     // 5. STATUSTEXT (#253)
     if (packet.msgId === 253) {
       const p = packet.payload;
@@ -274,6 +287,33 @@ export const App: React.FC = () => {
           { timestamp: packet.timestamp, text: p.text, severity: p.severity || 6 },
           ...prev.slice(0, 99), // Keep latest 100 logs
         ]);
+      }
+    }
+
+    // 6. COMMAND_ACK (#77)
+    if (packet.msgId === 77) {
+      const ack = packet.payload as CommandAckMsg;
+      const cmdName =
+        ack.command === 511
+          ? 'SET_MESSAGE_INTERVAL (#511)'
+          : ack.command === 512
+          ? 'REQUEST_MESSAGE (#512)'
+          : `#${ack.command}`;
+      const isAccepted = ack.result === MavResult.ACCEPTED;
+
+      setStatusLogs((prev) => [
+        {
+          timestamp: packet.timestamp,
+          text: `[RX ACK] 指令 ${cmdName} 飛控回應: ${ack.resultText} (SYS:${packet.sysId} COMP:${packet.compId})`,
+          severity: isAccepted ? 6 : 3,
+        },
+        ...prev.slice(0, 99),
+      ]);
+
+      // Notify any pending command waiter
+      if (pendingAckWaitersRef.current[ack.command]) {
+        pendingAckWaitersRef.current[ack.command](ack);
+        delete pendingAckWaitersRef.current[ack.command];
       }
     }
   }, [triggerRxPulse]);
@@ -379,70 +419,147 @@ export const App: React.FC = () => {
     setSerialConnected(false);
   };
 
+  // Periodic GCS Heartbeat broadcast (1 Hz) to notify Flight Controller that GCS is active
+  useEffect(() => {
+    if (!serialConnected) return;
+
+    const heartbeatInterval = setInterval(async () => {
+      try {
+        if (serialServiceRef.current?.isConnected()) {
+          const hbPacket = encodeHeartbeat(txSeqRef.current++, 255, 190);
+          await serialServiceRef.current.send(hbPacket);
+        }
+      } catch {
+        // Silently catch write issues if port disconnected
+      }
+    }, 1000);
+
+    return () => clearInterval(heartbeatInterval);
+  }, [serialConnected]);
+
   // Send MAV_CMD_SET_MESSAGE_INTERVAL to Autopilot
   const handleSetMessageInterval = async (
     msgId: number,
     hz: number,
-    targetSys: number = 1,
-    targetComp: number = 1
-  ): Promise<boolean> => {
+    targetSys?: number,
+    targetComp?: number
+  ): Promise<{ ok: boolean; message?: string }> => {
+    const sys = targetSys !== undefined ? targetSys : detectedSysId;
+    const comp = targetComp !== undefined ? targetComp : detectedCompId;
+
     try {
-      const packet = encodeSetMessageInterval(msgId, hz, txSeqRef.current++, targetSys, targetComp);
+      const packet = encodeSetMessageInterval(msgId, hz, txSeqRef.current++, sys, comp);
       if (serialServiceRef.current?.isConnected()) {
+        const ackPromise = new Promise<CommandAckMsg | null>((resolve) => {
+          pendingAckWaitersRef.current[511] = resolve;
+          setTimeout(() => {
+            if (pendingAckWaitersRef.current[511] === resolve) {
+              delete pendingAckWaitersRef.current[511];
+              resolve(null);
+            }
+          }, 1200); // Wait up to 1.2s for ACK
+        });
+
         await serialServiceRef.current.send(packet);
+        const intervalDesc = hz > 0 ? Math.round(1000000 / hz) + 'us' : 'OFF';
         setStatusLogs((prev) => [
           {
             timestamp: Date.now(),
-            text: `[TX CMD] SET_MESSAGE_INTERVAL: Msg #${msgId} -> ${hz} Hz (${hz > 0 ? Math.round(1000000 / hz) + 'us' : 'OFF'})`,
+            text: `[TX CMD] SET_MESSAGE_INTERVAL: Msg #${msgId} -> ${hz} Hz (${intervalDesc}) -> Target SYS:${sys} COMP:${comp}`,
             severity: 6,
           },
           ...prev.slice(0, 99),
         ]);
-        return true;
+
+        const ack = await ackPromise;
+        if (ack) {
+          const isAccepted = ack.result === MavResult.ACCEPTED;
+          return {
+            ok: isAccepted,
+            message: `飛控回傳 ACK: ${ack.resultText}`,
+          };
+        } else {
+          return {
+            ok: true,
+            message: `指令已送出至 SYS:${sys} COMP:${comp} (未收到 ACK，部分飛控不會主動確認)`,
+          };
+        }
       } else {
         alert('串口尚未連線，無法發送 MAVLink 頻率請求。請先點擊 CONNECT 連線至飛控。');
-        return false;
+        return { ok: false, message: '串口未連線' };
       }
     } catch (e: any) {
       alert(`發送指令失敗: ${e.message}`);
-      return false;
+      return { ok: false, message: e.message };
     }
   };
 
   // Send MAV_CMD_REQUEST_MESSAGE (One-shot)
   const handleRequestOnce = async (
     msgId: number,
-    targetSys: number = 1,
-    targetComp: number = 1
-  ): Promise<boolean> => {
+    targetSys?: number,
+    targetComp?: number
+  ): Promise<{ ok: boolean; message?: string }> => {
+    const sys = targetSys !== undefined ? targetSys : detectedSysId;
+    const comp = targetComp !== undefined ? targetComp : detectedCompId;
+
     try {
-      const packet = encodeRequestMessage(msgId, txSeqRef.current++, targetSys, targetComp);
+      const packet = encodeRequestMessage(msgId, txSeqRef.current++, sys, comp);
       if (serialServiceRef.current?.isConnected()) {
+        const ackPromise = new Promise<CommandAckMsg | null>((resolve) => {
+          pendingAckWaitersRef.current[512] = resolve;
+          setTimeout(() => {
+            if (pendingAckWaitersRef.current[512] === resolve) {
+              delete pendingAckWaitersRef.current[512];
+              resolve(null);
+            }
+          }, 1200);
+        });
+
         await serialServiceRef.current.send(packet);
         setStatusLogs((prev) => [
           {
             timestamp: Date.now(),
-            text: `[TX CMD] REQUEST_MESSAGE: Msg #${msgId} (One-shot)`,
+            text: `[TX CMD] REQUEST_MESSAGE: Msg #${msgId} (One-shot) -> Target SYS:${sys} COMP:${comp}`,
             severity: 6,
           },
           ...prev.slice(0, 99),
         ]);
-        return true;
+
+        const ack = await ackPromise;
+        if (ack) {
+          const isAccepted = ack.result === MavResult.ACCEPTED;
+          return {
+            ok: isAccepted,
+            message: `飛控回傳 ACK: ${ack.resultText}`,
+          };
+        } else {
+          return {
+            ok: true,
+            message: `一次性請求已送出至 SYS:${sys} COMP:${comp}`,
+          };
+        }
       } else {
         alert('串口尚未連線，無法發送 MAVLink 指令。');
-        return false;
+        return { ok: false, message: '串口未連線' };
       }
     } catch (e: any) {
       alert(`發送指令失敗: ${e.message}`);
-      return false;
+      return { ok: false, message: e.message };
     }
   };
 
   // Batch Request
-  const handleBatchSetRates = async (configs: { msgId: number; hz: number }[]) => {
+  const handleBatchSetRates = async (
+    configs: { msgId: number; hz: number }[],
+    targetSys?: number,
+    targetComp?: number
+  ) => {
+    const sys = targetSys !== undefined ? targetSys : detectedSysId;
+    const comp = targetComp !== undefined ? targetComp : detectedCompId;
     for (const cfg of configs) {
-      await handleSetMessageInterval(cfg.msgId, cfg.hz);
-      await new Promise((r) => setTimeout(r, 50)); // small delay
+      await handleSetMessageInterval(cfg.msgId, cfg.hz, sys, comp);
+      await new Promise((r) => setTimeout(r, 60)); // small delay between commands
     }
   };
 
@@ -701,6 +818,8 @@ export const App: React.FC = () => {
         onRequestOnce={handleRequestOnce}
         onBatchSetRates={handleBatchSetRates}
         isConnected={serialConnected}
+        detectedSysId={detectedSysId}
+        detectedCompId={detectedCompId}
       />
     </div>
   );
