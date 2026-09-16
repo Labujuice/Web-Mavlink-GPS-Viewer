@@ -5,9 +5,10 @@ import { Splitter } from './Splitter';
 
 interface SkyplotChartProps {
   satellites: SatelliteInfo[];
+  themeMode?: 'day' | 'night';
 }
 
-export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
+export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites, themeMode = 'night' }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const polarRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -90,14 +91,22 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
       .filter((s) => !s.used)
       .map((s) => [s.elevation, s.azimuth, s.prn, s.snr]);
 
+    const isDay = themeMode === 'day';
+    const bgColor = isDay ? '#ffffff' : '#000000';
+    const textColor = isDay ? '#000000' : '#00ff66';
+    const dimColor = isDay ? '#52525b' : '#15803d';
+    const borderColor = isDay ? '#000000' : '#00ff66';
+    const axisLineColor = isDay ? '#000000' : '#14331a';
+    const splitLineColor = isDay ? '#e2e8f0' : '#102815';
+
     const option: echarts.EChartsOption = {
-      backgroundColor: '#000000',
+      backgroundColor: bgColor,
       title: {
         text: 'CONSTELLATION SKYPLOT (AZ / EL)',
         left: 10,
         top: 8,
         textStyle: {
-          color: '#00ff66',
+          color: textColor,
           fontSize: 11,
           fontFamily: 'monospace',
           fontWeight: 'bold',
@@ -108,9 +117,9 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
         radius: '75%',
       },
       tooltip: {
-        backgroundColor: '#050805',
-        borderColor: '#00ff66',
-        textStyle: { color: '#00ff66', fontFamily: 'monospace', fontSize: 11 },
+        backgroundColor: isDay ? '#ffffff' : '#050805',
+        borderColor: borderColor,
+        textStyle: { color: textColor, fontFamily: 'monospace', fontSize: 11 },
         formatter: (params: any) => {
           const [el, az, prn, snr] = params.data;
           const status = params.seriesName;
@@ -124,10 +133,10 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
         startAngle: 90, // 0 deg is North (top)
         clockwise: true,
         interval: 45,
-        axisLine: { lineStyle: { color: '#14331a' } },
-        splitLine: { lineStyle: { color: '#102815', type: 'dashed' } },
+        axisLine: { lineStyle: { color: axisLineColor } },
+        splitLine: { lineStyle: { color: splitLineColor, type: 'dashed' } },
         axisLabel: {
-          color: '#00ff66',
+          color: textColor,
           fontFamily: 'monospace',
           fontSize: 10,
           formatter: (val: number) => {
@@ -144,10 +153,10 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
         max: 90,
         inverse: true, // 90 deg zenith at center, 0 deg horizon at edge
         interval: 30,
-        axisLine: { lineStyle: { color: '#14331a' } },
-        splitLine: { lineStyle: { color: '#14331a' } },
+        axisLine: { lineStyle: { color: axisLineColor } },
+        splitLine: { lineStyle: { color: isDay ? '#e2e8f0' : '#14331a' } },
         axisLabel: {
-          color: '#15803d',
+          color: dimColor,
           fontFamily: 'monospace',
           fontSize: 9,
           formatter: '{value}°',
@@ -161,14 +170,14 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
           data: usedData,
           symbolSize: 22,
           itemStyle: {
-            color: 'rgba(0, 255, 102, 0.25)',
-            borderColor: '#00ff66',
+            color: isDay ? 'rgba(0, 0, 0, 0.25)' : 'rgba(0, 255, 102, 0.25)',
+            borderColor: borderColor,
             borderWidth: 2,
           },
           label: {
             show: true,
             formatter: (params: any) => `${params.data[2]}`,
-            color: '#00ff66',
+            color: textColor,
             fontWeight: 'bold',
             fontFamily: 'monospace',
             fontSize: 9,
@@ -182,14 +191,14 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
           symbolSize: 20,
           itemStyle: {
             color: 'transparent',
-            borderColor: '#15803d',
+            borderColor: isDay ? '#71717a' : '#15803d',
             borderWidth: 1,
             borderType: 'dashed',
           },
           label: {
             show: true,
             formatter: (params: any) => `${params.data[2]}`,
-            color: '#15803d',
+            color: dimColor,
             fontFamily: 'monospace',
             fontSize: 9,
           },
@@ -198,11 +207,18 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
     };
 
     polarChartRef.current.setOption(option);
-  }, [satellites]);
+  }, [satellites, themeMode]);
 
   // Update SNR Bar Chart
   useEffect(() => {
     if (!barChartRef.current) return;
+
+    const isDay = themeMode === 'day';
+    const bgColor = isDay ? '#ffffff' : '#000000';
+    const textColor = isDay ? '#000000' : '#00ff66';
+    const dimColor = isDay ? '#52525b' : '#15803d';
+    const axisLineColor = isDay ? '#000000' : '#1b3d22';
+    const splitLineColor = isDay ? '#e2e8f0' : '#0f2214';
 
     let validSats = satellites.filter((s) => s.prn > 0);
     if (snrSortBy === 'snr') {
@@ -217,20 +233,24 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
     const snrValues = validSats.map((s) => ({
       value: s.snr,
       itemStyle: {
-        color: s.used ? 'rgba(0, 255, 102, 0.7)' : 'rgba(21, 128, 61, 0.4)',
-        borderColor: s.used ? '#00ff66' : '#15803d',
+        color: s.used
+          ? (isDay ? '#000000' : 'rgba(0, 255, 102, 0.7)')
+          : (isDay ? '#a1a1aa' : 'rgba(21, 128, 61, 0.4)'),
+        borderColor: s.used
+          ? (isDay ? '#000000' : '#00ff66')
+          : (isDay ? '#71717a' : '#15803d'),
         borderWidth: 1,
       },
     }));
 
     const barOption: echarts.EChartsOption = {
-      backgroundColor: '#000000',
+      backgroundColor: bgColor,
       title: {
         text: `CARRIER-TO-NOISE (${snrSortBy === 'snr' ? 'BY SNR' : 'BY PRN'})`,
         left: 10,
         top: 8,
         textStyle: {
-          color: '#00ff66',
+          color: textColor,
           fontSize: 11,
           fontFamily: 'monospace',
           fontWeight: 'bold',
@@ -243,13 +263,13 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
         bottom: 25,
       },
       tooltip: {
-        backgroundColor: '#050805',
-        borderColor: '#00ff66',
-        textStyle: { color: '#00ff66', fontFamily: 'monospace', fontSize: 11 },
+        backgroundColor: isDay ? '#ffffff' : '#050805',
+        borderColor: isDay ? '#000000' : '#00ff66',
+        textStyle: { color: textColor, fontFamily: 'monospace', fontSize: 11 },
         formatter: (params: any) => {
           const sat = validSats[params.dataIndex];
           const statusText = sat?.used
-            ? '<span style="color:#00ff66;font-weight:bold;">USED</span>'
+            ? `<span style="color:${isDay ? '#000000' : '#00ff66'};font-weight:bold;">USED</span>`
             : '<span style="color:#71717a;">UNUSED</span>';
           return `PRN: ${params.name}<br/>SNR: ${params.value} dB-Hz<br/>Status: ${statusText}`;
         },
@@ -257,9 +277,9 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
       xAxis: {
         type: 'category',
         data: prnLabels,
-        axisLine: { lineStyle: { color: '#1b3d22' } },
+        axisLine: { lineStyle: { color: axisLineColor } },
         axisLabel: {
-          color: '#00ff66',
+          color: textColor,
           fontFamily: 'monospace',
           fontSize: 9,
           interval: 0,
@@ -269,10 +289,10 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
         type: 'value',
         min: 0,
         max: 60,
-        axisLine: { lineStyle: { color: '#1b3d22' } },
-        splitLine: { lineStyle: { color: '#0f2214', type: 'dashed' } },
+        axisLine: { lineStyle: { color: axisLineColor } },
+        splitLine: { lineStyle: { color: splitLineColor, type: 'dashed' } },
         axisLabel: {
-          color: '#15803d',
+          color: dimColor,
           fontFamily: 'monospace',
           fontSize: 9,
         },
@@ -288,7 +308,7 @@ export const SkyplotChart: React.FC<SkyplotChartProps> = ({ satellites }) => {
     };
 
     barChartRef.current.setOption(barOption);
-  }, [satellites, snrSortBy]);
+  }, [satellites, snrSortBy, themeMode]);
 
   return (
     <div

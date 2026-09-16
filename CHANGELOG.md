@@ -25,6 +25,12 @@
   - 新增 `REQUEST_DATA_STREAM` (#66) 編碼函數，提供向舊版或特規飛控請求成組串流能力。
 - **SNR 柱狀圖排序切換**：
   - 新增 PRN 編號遞增與 SNR 訊號強度降序（高至低）切換按鈕，支援狀態持久化至 localStorage。
+- **日間 / 夜間模式動態切換 (Day / Night High Contrast Mode)**：
+  - 開啟時自動依系統時間決定初次模式（06:00 ~ 17:59 自動啟用 Day Mode，18:00 ~ 05:59 自動啟用 Night Mode）。
+  - 頂部導航列提供即時切換按鈕，且狀態不具記憶性（重整網頁時自動重新依當前系統時間決定）。
+  - **Day Mode 超強對比設計**：全介面黑底切換為純白底（`#ffffff`），邊框線條、數值與等寬字體改為高對比純黑（`#000000`），解決日間戶外強光下不易辨識的問題。
+  - 同步切換 ECharts 圖表（Skyplot 天頂圖、SNR 柱狀圖、CEP 散佈圖）背景、格線與資料點色彩。
+  - Leaflet 2D 地圖自動切換為高清晰淺色圖資（LIGHT HUD），航跡軌跡線與機頭朝向箭頭同步調整為超高對比黑色。
 - **專案授權協議與線上入口更新**：
   - 補上根目錄 [MIT License](LICENSE) 授權文件。
   - 於 `README.md` 標註線上即用體驗入口（[https://labujuice.github.io/Web-Mavlink-GPS-Viewer/](https://labujuice.github.io/Web-Mavlink-GPS-Viewer/)）與 Live Demo 徽章。

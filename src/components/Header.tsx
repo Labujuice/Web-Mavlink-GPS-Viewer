@@ -12,6 +12,8 @@ import {
   Settings,
   Usb,
   Sliders,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { GpsFixType } from '../types/mavlink';
 import { SimulatorMode } from '../services/simulator';
@@ -20,6 +22,9 @@ import { SerialPortItem } from '../services/serial';
 interface HeaderProps {
   sourceType: 'serial' | 'replay' | 'sim';
   setSourceType: (type: 'serial' | 'replay' | 'sim') => void;
+  // Theme
+  themeMode: 'day' | 'night';
+  onToggleTheme: () => void;
   // Serial
   serialConnected: boolean;
   onSerialConnect: () => void;
@@ -58,6 +63,8 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   sourceType,
   setSourceType,
+  themeMode,
+  onToggleTheme,
   serialConnected,
   onSerialConnect,
   onSerialDisconnect,
@@ -357,6 +364,33 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <RotateCcw className="w-3.5 h-3.5" />
           CLEAR
+        </button>
+
+        {/* Day / Night Mode Switcher */}
+        <button
+          onClick={onToggleTheme}
+          title={
+            themeMode === 'day'
+              ? '目前為日間高對比模式，點擊切換為夜間模式 (依系統時間自動判斷，不具記憶性)'
+              : '目前為夜間模式，點擊切換為日間高對比白底 (依系統時間自動判斷，不具記憶性)'
+          }
+          className={`px-2.5 py-1 text-xs border transition-colors flex items-center gap-1.5 font-bold font-mono ${
+            themeMode === 'day'
+              ? 'border-black text-black bg-amber-100 hover:bg-amber-200'
+              : 'border-cyber-line text-cyber-line bg-cyber-dark hover:bg-cyber-line/20'
+          }`}
+        >
+          {themeMode === 'day' ? (
+            <>
+              <Sun className="w-3.5 h-3.5 text-amber-600" />
+              <span>DAY</span>
+            </>
+          ) : (
+            <>
+              <Moon className="w-3.5 h-3.5 text-cyber-line" />
+              <span>NIGHT</span>
+            </>
+          )}
         </button>
       </div>
     </header>
