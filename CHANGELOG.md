@@ -4,6 +4,33 @@
 
 ---
 
+## [0.2.0] - 2026-09-16
+
+### 修復 (Fixed)
+- **MAVLink CRC_EXTRA 補齊與驗證校正**：
+  - 補齊 `COMMAND_LONG` (#76, CRC: 152)、`COMMAND_ACK` (#77, CRC: 143) 與 `REQUEST_DATA_STREAM` (#66, CRC: 148) 的 CRC_EXTRA 數值。
+  - 解決先前發送 MAVLink 指令封包時因缺少正確 CRC_EXTRA 導致飛控端校驗失敗並默默丟棄的問題。
+- **目標 System ID / Component ID 自動識別與綁定**：
+  - 串流解析加入自動偵測機制，即時提取接收封包中的真實 `sysId` 與 `compId`。
+  - 「串流頻率設定面板」自動套用偵測到的飛控 ID，解決預設 `SYS: 1 / COMP: 1` 導致自訂 ID 或外接 GPS 模組無法接收指令的問題。
+
+### 新增 (Added)
+- **GCS 地面站心跳廣播 (Heartbeat 1Hz)**：
+  - 串口建立連線後，自動以 1 Hz 週期廣播標準 GCS 心跳封包（`HEARTBEAT` #0，`MAV_TYPE_GCS`，SYS: 255 / COMP: 190）。
+  - 主動維持與飛控通訊活躍鏈路，防止飛控因無地面站心跳而停止遙測串流或拒絕執行指令。
+- **COMMAND_ACK (#77) 應答解析與狀態反饋**：
+  - 支援完整解碼 `COMMAND_ACK` 封包，定義 `MavResult` 列舉型別（包含 ACCEPTED、TEMPORARILY_REJECTED、DENIED、UNSUPPORTED、FAILED 等詳細中文狀態）。
+  - 指令發送（`SET_MESSAGE_INTERVAL` 與 `REQUEST_MESSAGE`）具備 1.2 秒超時等候機制，若收到飛控 ACK 立即於日誌顯示執行結果。
+- **傳統資料串流請求編碼**：
+  - 新增 `REQUEST_DATA_STREAM` (#66) 編碼函數，提供向舊版或特規飛控請求成組串流能力。
+- **SNR 柱狀圖排序切換**：
+  - 新增 PRN 編號遞增與 SNR 訊號強度降序（高至低）切換按鈕，支援狀態持久化至 localStorage。
+- **專案授權協議與線上入口更新**：
+  - 補上根目錄 [MIT License](LICENSE) 授權文件。
+  - 於 `README.md` 標註線上即用體驗入口（[https://labujuice.github.io/Web-Mavlink-GPS-Viewer/](https://labujuice.github.io/Web-Mavlink-GPS-Viewer/)）與 Live Demo 徽章。
+
+---
+
 ## [0.1.0] - 2026-09-15
 
 ### 新增 (Added)

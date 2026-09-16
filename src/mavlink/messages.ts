@@ -5,6 +5,8 @@ import {
   GlobalPositionIntMsg,
   GpsRtkMsg,
   StatusTextMsg,
+  CommandAckMsg,
+  MavResult,
 } from '../types/mavlink';
 
 // Safe DataView helper to avoid out-of-bounds errors on truncated packets
@@ -161,4 +163,35 @@ export function decodeStatusText(payload: Uint8Array): StatusTextMsg {
     id: payload.length >= 53 ? r.getUint16(51) : undefined,
     chunk_seq: payload.length >= 54 ? r.getUint8(53) : undefined,
   };
+}
+
+const MAV_RESULT_STRINGS: Record<number, string> = {
+  0: 'ACCEPTED (已接受並執行)',
+  1: 'TEMPORARILY_REJECTED (暫時拒絕)',
+  2: 'DENIED (已被拒絕)',
+  3: 'UNSUPPORTED (不支援此指令)',
+  4: 'FAILED (執行失敗)',
+  5: 'IN_PROGRESS (執行中)',
+  6: 'CANCELLED (已取消)',
+};
+
+export function decodeCommandAck(payload: Uint8Array): CommandAckMsg {
+  const r = new BufferReader(payload);
+  const command = r.getUint16(0);
+  const result = r.getUint8(2) as MavResult;
+  const resultText = MAV_RESULT_STRINGS[result] || `UNKNOWN (${result})`;
+
+  const msg: CommandAckMsg = {
+    command,
+    result,
+    resultText,
+  };
+
+  // MAVLink 2 extension fields
+  if (payload.length >= 4) msg.progress = r.getUint8(3);
+  if (payload.length >= 8) msg.result_param2 = r.getInt32(4);
+  if (payload.length >= 9) msg.target_system = r.getUint8(8);
+  if (payload.length >= 10) msg.target_component = r.getUint8(9);
+
+  return msg;
 }

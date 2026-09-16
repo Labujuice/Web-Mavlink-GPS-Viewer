@@ -1,5 +1,6 @@
 # MAVLink GPS Viewer
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Online-00ff66.svg?style=flat-square&logo=github)](https://labujuice.github.io/Web-Mavlink-GPS-Viewer/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-00ff66.svg?style=flat-square)](LICENSE)
 [![Architecture: 100% Pure Frontend](https://img.shields.io/badge/Architecture-100%25%20Pure%20Frontend-00ff66.svg?style=flat-square)]()
 [![Theme: Cyber--Tactical HUD](https://img.shields.io/badge/Theme-Cyber--Tactical%20HUD-000000.svg?style=flat-square&color=00ff66)]()
@@ -7,6 +8,9 @@
 一個專為 MAVLink 協定設計的 **100% 純前端 (Zero Backend) 即時 GPS 遙測與精度分析儀表板**。
 
 無須安裝任何後端服務、Python 或本機資料庫，直接於現代瀏覽器中開啟即用；關閉或重新整理網頁時自動清空記憶體重置。
+
+> 🌐 **線上體驗入口 (Live Demo)**：[https://labujuice.github.io/Web-Mavlink-GPS-Viewer/](https://labujuice.github.io/Web-Mavlink-GPS-Viewer/)  
+> *(免安裝任何伺服器或後端，使用 Chrome / Edge 等支援 Web Serial 的瀏覽器開啟即可直接連線硬體或重播紀錄)*
 
 ---
 
@@ -149,7 +153,7 @@ jobs:
         uses: actions/deploy-pages@v4
 ```
 2. 前往 GitHub Repo 的 **Settings -> Pages**，將 Source 設定為 **GitHub Actions**。
-3. 每次推送到 `master` 或 `main` 分支時，將自動編譯並部署至 `https://<username>.github.io/<repo-name>/`。
+3. 每次推送到 `master` 或 `main` 分支時，GitHub Actions 將自動編譯並發布至：**[https://labujuice.github.io/Web-Mavlink-GPS-Viewer/](https://labujuice.github.io/Web-Mavlink-GPS-Viewer/)**。
 
 ---
 

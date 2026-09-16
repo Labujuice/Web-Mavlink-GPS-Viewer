@@ -13,10 +13,12 @@ interface MessageRateModalProps {
   isOpen: boolean;
   onClose: () => void;
   rates: Record<number, number>; // actual measured incoming Hz
-  onSetRate: (msgId: number, hz: number, targetSys: number, targetComp: number) => Promise<boolean>;
-  onRequestOnce: (msgId: number, targetSys: number, targetComp: number) => Promise<boolean>;
-  onBatchSetRates: (configs: { msgId: number; hz: number }[]) => Promise<void>;
+  onSetRate: (msgId: number, hz: number, targetSys: number, targetComp: number) => Promise<{ ok: boolean; message?: string }>;
+  onRequestOnce: (msgId: number, targetSys: number, targetComp: number) => Promise<{ ok: boolean; message?: string }>;
+  onBatchSetRates: (configs: { msgId: number; hz: number }[], targetSys: number, targetComp: number) => Promise<void>;
   isConnected: boolean;
+  detectedSysId?: number;
+  detectedCompId?: number;
 }
 
 export const MessageRateModal: React.FC<MessageRateModalProps> = ({
@@ -27,9 +29,11 @@ export const MessageRateModal: React.FC<MessageRateModalProps> = ({
   onRequestOnce,
   onBatchSetRates,
   isConnected,
+  detectedSysId,
+  detectedCompId,
 }) => {
-  const [targetSys, setTargetSys] = useState<number>(1);
-  const [targetComp, setTargetComp] = useState<number>(1);
+  const [targetSys, setTargetSys] = useState<number>(detectedSysId || 1);
+  const [targetComp, setTargetComp] = useState<number>(detectedCompId || 1);
   const [desiredRates, setDesiredRates] = useState<Record<number, number>>({
     24: 5,
     25: 1,
@@ -38,6 +42,16 @@ export const MessageRateModal: React.FC<MessageRateModalProps> = ({
     127: 1,
     128: 0,
   });
+
+  // Auto-sync target sysId & compId whenever detected values update
+  React.useEffect(() => {
+    if (detectedSysId && detectedSysId !== 0) {
+      setTargetSys(detectedSysId);
+    }
+    if (detectedCompId && detectedCompId !== 0) {
+      setTargetComp(detectedCompId);
+    }
+  }, [detectedSysId, detectedCompId, isOpen]);
 
   // Custom Message ID input
   const [customMsgId, setCustomMsgId] = useState<string>('');
@@ -58,62 +72,74 @@ export const MessageRateModal: React.FC<MessageRateModalProps> = ({
   ];
 
   const handleSendRate = async (msgId: number, hz: number) => {
-    setActionLog(`正在請求 #${msgId} 設定為 ${hz} Hz...`);
-    const ok = await onSetRate(msgId, hz, targetSys, targetComp);
-    if (ok) {
-      setActionLog(`已送出: #${msgId} 設定為 ${hz} Hz (間隔: ${hz > 0 ? Math.round(1000000 / hz) + 'us' : '停止'})`);
+    setActionLog(`正在向 SYS:${targetSys} COMP:${targetComp} 請求 #${msgId} 設定為 ${hz} Hz...`);
+    const res = await onSetRate(msgId, hz, targetSys, targetComp);
+    if (res.ok) {
+      setActionLog(`[成功] #${msgId} -> ${hz} Hz: ${res.message || '已送出'}`);
     } else {
-      setActionLog(`發送失敗: 請確認串口連線正常。`);
+      setActionLog(`[警告/失敗] #${msgId}: ${res.message || '發送失敗'}`);
     }
   };
 
   const handleRequestOneShot = async (msgId: number) => {
-    setActionLog(`正在請求一次性接收 #${msgId}...`);
-    const ok = await onRequestOnce(msgId, targetSys, targetComp);
-    if (ok) {
-      setActionLog(`已送出一次性請求: #${msgId}`);
+    setActionLog(`正在向 SYS:${targetSys} COMP:${targetComp} 請求單次接收 #${msgId}...`);
+    const res = await onRequestOnce(msgId, targetSys, targetComp);
+    if (res.ok) {
+      setActionLog(`[成功] 單次請求 #${msgId}: ${res.message || '已送出'}`);
     } else {
-      setActionLog(`發送失敗: 請確認串口連線正常。`);
+      setActionLog(`[警告/失敗] #${msgId}: ${res.message || '發送失敗'}`);
     }
   };
 
   // Presets
   const applyStandardPreset = async () => {
-    setActionLog('正在套用標準推薦頻率 (Raw 5Hz, Status 1Hz, RTK 1Hz)...');
-    await onBatchSetRates([
-      { msgId: 24, hz: 5 },
-      { msgId: 25, hz: 1 },
-      { msgId: 33, hz: 5 },
-      { msgId: 127, hz: 1 },
-    ]);
+    setActionLog(`正在套用標準推薦頻率 (Raw 5Hz, Status 1Hz, RTK 1Hz) 至 SYS:${targetSys} COMP:${targetComp}...`);
+    await onBatchSetRates(
+      [
+        { msgId: 24, hz: 5 },
+        { msgId: 25, hz: 1 },
+        { msgId: 33, hz: 5 },
+        { msgId: 127, hz: 1 },
+      ],
+      targetSys,
+      targetComp
+    );
     setDesiredRates((prev) => ({ ...prev, 24: 5, 25: 1, 33: 5, 127: 1 }));
-    setActionLog('標準頻率請求已全數送出！');
+    setActionLog(`標準頻率請求已全數送出 (目標 SYS:${targetSys} COMP:${targetComp})！`);
   };
 
   const applyHighRatePreset = async () => {
-    setActionLog('正在套用高頻監控頻率 (Raw 10Hz, Pos 10Hz, Status 2Hz)...');
-    await onBatchSetRates([
-      { msgId: 24, hz: 10 },
-      { msgId: 25, hz: 2 },
-      { msgId: 33, hz: 10 },
-      { msgId: 127, hz: 5 },
-    ]);
+    setActionLog(`正在套用高頻監控頻率 (Raw 10Hz, Pos 10Hz, Status 2Hz) 至 SYS:${targetSys} COMP:${targetComp}...`);
+    await onBatchSetRates(
+      [
+        { msgId: 24, hz: 10 },
+        { msgId: 25, hz: 2 },
+        { msgId: 33, hz: 10 },
+        { msgId: 127, hz: 5 },
+      ],
+      targetSys,
+      targetComp
+    );
     setDesiredRates((prev) => ({ ...prev, 24: 10, 25: 2, 33: 10, 127: 5 }));
-    setActionLog('高頻監控請求已全數送出！');
+    setActionLog(`高頻監控請求已全數送出 (目標 SYS:${targetSys} COMP:${targetComp})！`);
   };
 
   const applyStopAllPreset = async () => {
-    setActionLog('正在發送停用所有 GPS 串流 (0 Hz)...');
-    await onBatchSetRates([
-      { msgId: 24, hz: 0 },
-      { msgId: 25, hz: 0 },
-      { msgId: 33, hz: 0 },
-      { msgId: 124, hz: 0 },
-      { msgId: 127, hz: 0 },
-      { msgId: 128, hz: 0 },
-    ]);
+    setActionLog(`正在發送停用所有 GPS 串流 (0 Hz) 至 SYS:${targetSys} COMP:${targetComp}...`);
+    await onBatchSetRates(
+      [
+        { msgId: 24, hz: 0 },
+        { msgId: 25, hz: 0 },
+        { msgId: 33, hz: 0 },
+        { msgId: 124, hz: 0 },
+        { msgId: 127, hz: 0 },
+        { msgId: 128, hz: 0 },
+      ],
+      targetSys,
+      targetComp
+    );
     setDesiredRates({ 24: 0, 25: 0, 33: 0, 124: 0, 127: 0, 128: 0 });
-    setActionLog('已送出全部停止串流指令！');
+    setActionLog(`已送出全部停止串流指令 (目標 SYS:${targetSys} COMP:${targetComp})！`);
   };
 
   return (
@@ -134,6 +160,11 @@ export const MessageRateModal: React.FC<MessageRateModalProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-3 text-xs mb-3 border border-cyber-border/60 p-2.5 bg-cyber-dark/60">
           <div className="text-[11px] text-cyber-muted">
             透過 MAVLink 標準 <code>COMMAND_LONG (#76)</code> 向飛控請求指定頻率。
+            {detectedSysId !== undefined && detectedSysId > 0 && (
+              <span className="ml-2 text-cyber-line font-bold border border-cyber-line/50 px-1 py-0.2 bg-cyber-line/10">
+                AUTO DETECTED: SYS {detectedSysId} / COMP {detectedCompId || 1}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5">
@@ -145,6 +176,7 @@ export const MessageRateModal: React.FC<MessageRateModalProps> = ({
                 value={targetSys}
                 onChange={(e) => setTargetSys(Number(e.target.value))}
                 className="w-12 bg-black border border-cyber-border px-1 py-0.5 text-center text-cyber-line text-xs"
+                title="飛控或設備的 System ID (預設或自動偵測值，0為廣播)"
               />
             </div>
             <div className="flex items-center gap-1.5">
@@ -156,6 +188,7 @@ export const MessageRateModal: React.FC<MessageRateModalProps> = ({
                 value={targetComp}
                 onChange={(e) => setTargetComp(Number(e.target.value))}
                 className="w-12 bg-black border border-cyber-border px-1 py-0.5 text-center text-cyber-line text-xs"
+                title="Component ID: 1為飛控, 220為外接GPS模組, 0為全體組件"
               />
             </div>
           </div>

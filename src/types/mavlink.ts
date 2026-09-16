@@ -96,6 +96,26 @@ export interface StatusTextMsg {
   chunk_seq?: number;
 }
 
+export enum MavResult {
+  ACCEPTED = 0,
+  TEMPORARILY_REJECTED = 1,
+  DENIED = 2,
+  UNSUPPORTED = 3,
+  FAILED = 4,
+  IN_PROGRESS = 5,
+  CANCELLED = 6,
+}
+
+export interface CommandAckMsg {
+  command: number;
+  result: MavResult;
+  resultText: string;
+  progress?: number;
+  result_param2?: number;
+  target_system?: number;
+  target_component?: number;
+}
+
 export interface DecodedMavPacket {
   msgId: number;
   msgName: string;

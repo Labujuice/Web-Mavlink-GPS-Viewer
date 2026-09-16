@@ -103,7 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="text-sm font-bold tracking-widest text-cyber-line text-glow flex items-center gap-2">
             MAV_GPS_VIEWER
             <span className="text-[10px] px-1 py-0.5 border border-cyber-dim text-cyber-muted tracking-normal">
-              v0.1.0
+              v0.2.0
             </span>
           </div>
           <div className="text-[10px] text-cyber-muted tracking-tight">
