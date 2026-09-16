@@ -10,6 +10,7 @@ interface CepChartProps {
   onResetCep: () => void;
   manualRefCoord: { lat: number; lon: number } | null;
   onSetManualRef: (coord: { lat: number; lon: number } | null) => void;
+  themeMode?: 'day' | 'night';
 }
 
 export const CepChart: React.FC<CepChartProps> = ({
@@ -18,6 +19,7 @@ export const CepChart: React.FC<CepChartProps> = ({
   onResetCep,
   manualRefCoord,
   onSetManualRef,
+  themeMode = 'night',
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const echartsInstance = useRef<echarts.ECharts | null>(null);
@@ -50,14 +52,23 @@ export const CepChart: React.FC<CepChartProps> = ({
     const refLat = cepStats.refLat;
     const refLon = cepStats.refLon;
 
+    const isDay = themeMode === 'day';
+    const bgColor = isDay ? '#ffffff' : '#000000';
+    const textColor = isDay ? '#000000' : '#00ff66';
+    const dimColor = isDay ? '#52525b' : '#15803d';
+    const axisLineColor = isDay ? '#000000' : '#1b3d22';
+    const splitLineColor = isDay ? '#e2e8f0' : '#0f2214';
+
     const scatterData = points.map((p, idx) => {
       const { x, y } = wgs84ToEnu(p.lat, p.lon, refLat, refLon);
       const isLatest = idx >= points.length - 5;
       return {
         value: [x, y],
         itemStyle: {
-          color: isLatest ? '#00ff66' : 'rgba(0, 255, 102, 0.35)',
-          borderColor: isLatest ? '#ffffff' : '#15803d',
+          color: isLatest
+            ? (isDay ? '#000000' : '#00ff66')
+            : (isDay ? 'rgba(0, 0, 0, 0.45)' : 'rgba(0, 255, 102, 0.35)'),
+          borderColor: isLatest ? (isDay ? '#ffffff' : '#ffffff') : (isDay ? '#000000' : '#15803d'),
           borderWidth: isLatest ? 1.5 : 0.5,
         },
       };
@@ -88,13 +99,13 @@ export const CepChart: React.FC<CepChartProps> = ({
     const drms2Circle = generateCircleSeries(cepStats.drms2);
 
     const option: echarts.EChartsOption = {
-      backgroundColor: '#000000',
+      backgroundColor: bgColor,
       title: {
         text: 'CIRCULAR ERROR PROBABLE (CEP) LOCAL ENU',
         left: 10,
         top: 8,
         textStyle: {
-          color: '#00ff66',
+          color: textColor,
           fontSize: 11,
           fontFamily: 'monospace',
           fontWeight: 'bold',
@@ -103,7 +114,7 @@ export const CepChart: React.FC<CepChartProps> = ({
       legend: {
         right: 10,
         top: 8,
-        textStyle: { color: '#00ff66', fontSize: 10, fontFamily: 'monospace' },
+        textStyle: { color: textColor, fontSize: 10, fontFamily: 'monospace' },
         data: ['CEP 50%', 'R95 (95%)', '2DRMS'],
       },
       grid: {
@@ -113,9 +124,9 @@ export const CepChart: React.FC<CepChartProps> = ({
         bottom: 35,
       },
       tooltip: {
-        backgroundColor: '#050805',
-        borderColor: '#00ff66',
-        textStyle: { color: '#00ff66', fontFamily: 'monospace', fontSize: 11 },
+        backgroundColor: isDay ? '#ffffff' : '#050805',
+        borderColor: isDay ? '#000000' : '#00ff66',
+        textStyle: { color: textColor, fontFamily: 'monospace', fontSize: 11 },
         formatter: (params: any) => {
           if (params.seriesType === 'scatter') {
             const [x, y] = params.data.value;
@@ -129,25 +140,25 @@ export const CepChart: React.FC<CepChartProps> = ({
         name: 'East (m)',
         nameLocation: 'middle',
         nameGap: 20,
-        nameTextStyle: { color: '#15803d', fontFamily: 'monospace', fontSize: 10 },
+        nameTextStyle: { color: dimColor, fontFamily: 'monospace', fontSize: 10 },
         type: 'value',
         min: -maxBound,
         max: maxBound,
-        axisLine: { lineStyle: { color: '#1b3d22' } },
-        splitLine: { lineStyle: { color: '#0f2214', type: 'dashed' } },
-        axisLabel: { color: '#00ff66', fontFamily: 'monospace', fontSize: 9, formatter: '{value}m' },
+        axisLine: { lineStyle: { color: axisLineColor } },
+        splitLine: { lineStyle: { color: splitLineColor, type: 'dashed' } },
+        axisLabel: { color: textColor, fontFamily: 'monospace', fontSize: 9, formatter: '{value}m' },
       },
       yAxis: {
         name: 'North (m)',
         nameLocation: 'middle',
         nameGap: 30,
-        nameTextStyle: { color: '#15803d', fontFamily: 'monospace', fontSize: 10 },
+        nameTextStyle: { color: dimColor, fontFamily: 'monospace', fontSize: 10 },
         type: 'value',
         min: -maxBound,
         max: maxBound,
-        axisLine: { lineStyle: { color: '#1b3d22' } },
-        splitLine: { lineStyle: { color: '#0f2214', type: 'dashed' } },
-        axisLabel: { color: '#00ff66', fontFamily: 'monospace', fontSize: 9, formatter: '{value}m' },
+        axisLine: { lineStyle: { color: axisLineColor } },
+        splitLine: { lineStyle: { color: splitLineColor, type: 'dashed' } },
+        axisLabel: { color: textColor, fontFamily: 'monospace', fontSize: 9, formatter: '{value}m' },
       },
       series: [
         {
@@ -162,7 +173,7 @@ export const CepChart: React.FC<CepChartProps> = ({
           type: 'line',
           showSymbol: false,
           data: cep50Circle,
-          lineStyle: { color: '#00ff66', width: 1.5, type: 'solid' },
+          lineStyle: { color: isDay ? '#000000' : '#00ff66', width: 2, type: 'solid' },
           z: 3,
         },
         {
@@ -170,7 +181,7 @@ export const CepChart: React.FC<CepChartProps> = ({
           type: 'line',
           showSymbol: false,
           data: r95Circle,
-          lineStyle: { color: '#eab308', width: 1.5, type: 'dashed' },
+          lineStyle: { color: isDay ? '#dc2626' : '#eab308', width: 1.8, type: 'dashed' },
           z: 3,
         },
         {
@@ -178,14 +189,14 @@ export const CepChart: React.FC<CepChartProps> = ({
           type: 'line',
           showSymbol: false,
           data: drms2Circle,
-          lineStyle: { color: '#38bdf8', width: 1.5, type: 'dotted' },
+          lineStyle: { color: isDay ? '#2563eb' : '#38bdf8', width: 1.8, type: 'dotted' },
           z: 3,
         },
       ],
     };
 
     echartsInstance.current.setOption(option);
-  }, [points, cepStats]);
+  }, [points, cepStats, themeMode]);
 
   return (
     <div className="flex flex-col h-full bg-cyber-black border border-cyber-border corner-box relative">

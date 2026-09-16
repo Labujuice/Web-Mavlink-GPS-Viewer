@@ -6,20 +6,24 @@ import { Crosshair, Layers } from 'lucide-react';
 interface MapViewProps {
   points: TrajectoryPoint[];
   currentPoint: TrajectoryPoint | null;
+  themeMode?: 'day' | 'night';
 }
 
-export const MapView: React.FC<MapViewProps> = ({ points, currentPoint }) => {
+export const MapView: React.FC<MapViewProps> = ({ points, currentPoint, themeMode = 'night' }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const trajectoryLayerRef = useRef<L.Polyline | null>(null);
   const vehicleMarkerRef = useRef<L.Marker | null>(null);
 
   const [followVehicle, setFollowVehicle] = useState<boolean>(true);
-  const [mapType, setMapType] = useState<'dark' | 'osm' | 'satellite'>('dark');
+  const [mapType, setMapType] = useState<'dark' | 'light' | 'osm' | 'satellite'>(
+    themeMode === 'day' ? 'light' : 'dark'
+  );
   const tileLayerRef = useRef<L.TileLayer | null>(null);
 
   const tileUrls = {
     dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
     osm: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
   };
@@ -84,6 +88,23 @@ export const MapView: React.FC<MapViewProps> = ({ points, currentPoint }) => {
     };
   }, []);
 
+  // Synchronize map layer and trajectory style when themeMode changes
+  useEffect(() => {
+    if (themeMode === 'day' && mapType === 'dark') {
+      setMapType('light');
+    } else if (themeMode === 'night' && mapType === 'light') {
+      setMapType('dark');
+    }
+
+    if (trajectoryLayerRef.current) {
+      trajectoryLayerRef.current.setStyle({
+        color: themeMode === 'day' ? '#000000' : '#00ff66',
+        weight: 3,
+        opacity: 0.9,
+      });
+    }
+  }, [themeMode]);
+
   // Update Tile Layer when mapType changes
   useEffect(() => {
     if (!mapInstanceRef.current || !tileLayerRef.current) return;
@@ -98,6 +119,9 @@ export const MapView: React.FC<MapViewProps> = ({ points, currentPoint }) => {
     if (trajectoryLayerRef.current) {
       const latlngs: L.LatLngExpression[] = points.map((p) => [p.lat, p.lon]);
       trajectoryLayerRef.current.setLatLngs(latlngs);
+      trajectoryLayerRef.current.setStyle({
+        color: themeMode === 'day' ? '#000000' : '#00ff66',
+      });
     }
 
     // Update Vehicle Marker
@@ -105,12 +129,14 @@ export const MapView: React.FC<MapViewProps> = ({ points, currentPoint }) => {
       vehicleMarkerRef.current.setLatLng([currentPoint.lat, currentPoint.lon]);
 
       const heading = currentPoint.heading || 0;
+      const isDay = themeMode === 'day';
+      const markerColor = isDay ? '#000000' : '#00ff66';
       const vehicleIcon = L.divIcon({
         className: 'vehicle-marker',
         html: `
           <div style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; transform: rotate(${heading}deg);">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <polygon points="12,2 22,22 12,17 2,22" fill="#00ff66" stroke="#ffffff" stroke-width="1.5" />
+              <polygon points="12,2 22,22 12,17 2,22" fill="${markerColor}" stroke="#ffffff" stroke-width="2" />
             </svg>
           </div>
         `,
@@ -126,7 +152,7 @@ export const MapView: React.FC<MapViewProps> = ({ points, currentPoint }) => {
         });
       }
     }
-  }, [points, currentPoint, followVehicle]);
+  }, [points, currentPoint, followVehicle, themeMode]);
 
   return (
     <div className="relative w-full h-full bg-cyber-black border border-cyber-border corner-box overflow-hidden">
@@ -143,9 +169,10 @@ export const MapView: React.FC<MapViewProps> = ({ points, currentPoint }) => {
             onChange={(e) => setMapType(e.target.value as any)}
             className="bg-transparent text-cyber-line text-[10px] font-mono focus:outline-none cursor-pointer"
           >
-            <option value="dark" className="bg-black text-cyber-line">DARK HUD</option>
-            <option value="osm" className="bg-black text-cyber-line">STREET (OSM)</option>
-            <option value="satellite" className="bg-black text-cyber-line">SATELLITE</option>
+            <option value="light">LIGHT HUD</option>
+            <option value="dark">DARK HUD</option>
+            <option value="osm">STREET (OSM)</option>
+            <option value="satellite">SATELLITE</option>
           </select>
         </div>
 

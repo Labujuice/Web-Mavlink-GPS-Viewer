@@ -29,7 +29,32 @@ import {
 } from './types/mavlink';
 import { calculateCepStats } from './utils/geo';
 
+export type ThemeMode = 'day' | 'night';
+
+const getInitialThemeMode = (): ThemeMode => {
+  const currentHour = new Date().getHours();
+  // Day mode: 06:00 to 17:59; Night mode: 18:00 to 05:59
+  return currentHour >= 6 && currentHour < 18 ? 'day' : 'night';
+};
+
 export const App: React.FC = () => {
+  // Theme State (Auto-decides based on system time upon load, not persisted in localStorage)
+  const [themeMode, setThemeMode] = useState<ThemeMode>(getInitialThemeMode);
+
+  const handleToggleTheme = () => {
+    setThemeMode((prev) => (prev === 'day' ? 'night' : 'day'));
+  };
+
+  useEffect(() => {
+    if (themeMode === 'day') {
+      document.body.classList.add('theme-day');
+      document.body.classList.remove('theme-night');
+    } else {
+      document.body.classList.add('theme-night');
+      document.body.classList.remove('theme-day');
+    }
+  }, [themeMode]);
+
   // Source State
   const [sourceType, setSourceType] = useState<'serial' | 'replay' | 'sim'>('sim');
   const [serialConnected, setSerialConnected] = useState<boolean>(false);
@@ -641,7 +666,11 @@ export const App: React.FC = () => {
   const usedSatsCount = satellites.filter((s) => s.used).length;
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-black text-cyber-text overflow-hidden">
+    <div
+      className={`flex flex-col h-screen w-screen overflow-hidden ${
+        themeMode === 'day' ? 'theme-day bg-white text-black' : 'theme-night bg-black text-cyber-text'
+      }`}
+    >
       {/* 1. Top Cyber-HUD Header */}
       <Header
         sourceType={sourceType}
@@ -652,6 +681,8 @@ export const App: React.FC = () => {
             setSimRunning(false);
           }
         }}
+        themeMode={themeMode}
+        onToggleTheme={handleToggleTheme}
         serialConnected={serialConnected}
         onSerialConnect={handleSerialConnect}
         onSerialDisconnect={handleSerialDisconnect}
@@ -717,7 +748,7 @@ export const App: React.FC = () => {
           style={isDesktop ? { width: `calc(${colWidths[0]}% - 8px)` } : undefined}
           className="w-full lg:w-auto h-full flex flex-col min-h-0 min-w-[200px]"
         >
-          <MapView points={points} currentPoint={currentPoint} />
+          <MapView themeMode={themeMode} points={points} currentPoint={currentPoint} />
         </div>
 
         {/* Resizable Divider 1 (Map vs Skyplot) */}
@@ -735,7 +766,7 @@ export const App: React.FC = () => {
           style={isDesktop ? { width: `calc(${colWidths[1]}% - 8px)` } : undefined}
           className="w-full lg:w-auto h-full flex flex-col min-h-0 min-w-[200px]"
         >
-          <SkyplotChart satellites={satellites} />
+          <SkyplotChart themeMode={themeMode} satellites={satellites} />
         </div>
 
         {/* Resizable Divider 2 (Skyplot vs CEP) */}
@@ -754,6 +785,7 @@ export const App: React.FC = () => {
           className="w-full lg:w-auto h-full flex flex-col min-h-0 min-w-[200px]"
         >
           <CepChart
+            themeMode={themeMode}
             points={points}
             cepStats={cepStats}
             onResetCep={handleResetCep}

@@ -4,10 +4,18 @@
 
 @layer base {
   body {
-    background-color: #000000;
-    color: #00ff66;
     font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
   }
+}
+
+body.theme-night {
+  background-color: #000000;
+  color: #00ff66;
+}
+
+body.theme-day {
+  background-color: #ffffff;
+  color: #000000;
 }
 
 /* Custom Cyberpunk / Avionics HUD Scrollbar */
@@ -15,16 +23,29 @@
   width: 6px;
   height: 6px;
 }
-::-webkit-scrollbar-track {
+
+body.theme-night ::-webkit-scrollbar-track {
   background: #050805;
   border-left: 1px solid #142817;
 }
-::-webkit-scrollbar-thumb {
+body.theme-night ::-webkit-scrollbar-thumb {
   background: #15803d;
   border-radius: 0px;
 }
-::-webkit-scrollbar-thumb:hover {
+body.theme-night ::-webkit-scrollbar-thumb:hover {
   background: #00ff66;
+}
+
+body.theme-day ::-webkit-scrollbar-track {
+  background: #f4f4f5;
+  border-left: 1px solid #000000;
+}
+body.theme-day ::-webkit-scrollbar-thumb {
+  background: #71717a;
+  border-radius: 0px;
+}
+body.theme-day ::-webkit-scrollbar-thumb:hover {
+  background: #000000;
 }
 
 /* Cyber Box Wireframe Styles */
@@ -75,20 +96,196 @@
 }
 
 /* Leaflet Dark Theme Overrides */
-.leaflet-container {
+body.theme-night .leaflet-container {
   background: #050805 !important;
 }
-.leaflet-control-zoom-in,
-.leaflet-control-zoom-out {
+body.theme-night .leaflet-control-zoom-in,
+body.theme-night .leaflet-control-zoom-out {
   background: #050805 !important;
   color: #00ff66 !important;
   border: 1px solid #1b3d22 !important;
 }
-.leaflet-control-attribution {
+body.theme-night .leaflet-control-attribution {
   background: rgba(0, 0, 0, 0.8) !important;
   color: #15803d !important;
   font-size: 10px !important;
 }
-.leaflet-control-attribution a {
+body.theme-night .leaflet-control-attribution a {
   color: #00ff66 !important;
 }
+
+/* ========================================================================= */
+/* DAY MODE (High Contrast Black-on-White) Overrides                         */
+/* ========================================================================= */
+
+body.theme-day .cyber-card {
+  background-color: #ffffff !important;
+  border: 1px solid #000000 !important;
+}
+body.theme-day .cyber-card:hover {
+  border-color: #000000 !important;
+}
+
+body.theme-day .corner-box::before {
+  border-top: 2px solid #000000 !important;
+  border-left: 2px solid #000000 !important;
+}
+body.theme-day .corner-box::after {
+  border-bottom: 2px solid #000000 !important;
+  border-right: 2px solid #000000 !important;
+}
+
+body.theme-day .text-glow {
+  text-shadow: none !important;
+}
+body.theme-day .border-glow {
+  box-shadow: none !important;
+}
+
+body.theme-day .bg-black,
+body.theme-day .bg-cyber-black {
+  background-color: #ffffff !important;
+}
+
+body.theme-day .bg-cyber-dark {
+  background-color: #f4f4f5 !important;
+}
+
+body.theme-day .bg-cyber-dark\/60,
+body.theme-day .bg-cyber-dark\/40 {
+  background-color: #f4f4f5 !important;
+}
+
+body.theme-day .bg-black\/80,
+body.theme-day .bg-black\/70,
+body.theme-day .bg-black\/90,
+body.theme-day .bg-black\/60 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+/* Backdrop for fixed modal overlays */
+body.theme-day .fixed.inset-0.bg-black\/80 {
+  background-color: rgba(0, 0, 0, 0.45) !important;
+  backdrop-filter: blur(2px);
+}
+
+body.theme-day .border-cyber-border,
+body.theme-day .border-cyber-border\/80,
+body.theme-day .border-cyber-border\/60,
+body.theme-day .border-cyber-border\/50,
+body.theme-day .border-cyber-border\/40,
+body.theme-day .border-cyber-border\/30,
+body.theme-day .border-cyber-border\/20 {
+  border-color: #000000 !important;
+}
+
+body.theme-day .border-cyber-line,
+body.theme-day .border-cyber-line\/50,
+body.theme-day .border-cyber-line\/70 {
+  border-color: #000000 !important;
+}
+
+body.theme-day .border-cyber-dim {
+  border-color: #71717a !important;
+}
+
+body.theme-day .text-cyber-line {
+  color: #000000 !important;
+}
+
+body.theme-day .text-cyber-muted,
+body.theme-day .text-cyber-muted\/60 {
+  color: #18181b !important;
+}
+
+body.theme-day .text-cyber-dim {
+  color: #52525b !important;
+}
+
+body.theme-day .text-cyber-text {
+  color: #000000 !important;
+}
+
+body.theme-day .bg-cyber-line\/10,
+body.theme-day .bg-cyber-line\/20 {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+  color: #000000 !important;
+}
+
+body.theme-day .hover\:bg-cyber-line\/20:hover,
+body.theme-day .hover\:bg-cyber-line\/10:hover {
+  background-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+body.theme-day .hover\:text-cyber-line:hover {
+  color: #000000 !important;
+}
+
+body.theme-day .hover\:border-cyber-line:hover {
+  border-color: #000000 !important;
+}
+
+body.theme-day select {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: #000000 !important;
+}
+
+body.theme-day select option {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+body.theme-day input {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: #000000 !important;
+}
+
+body.theme-day .leaflet-container {
+  background: #ffffff !important;
+}
+body.theme-day .leaflet-control-zoom-in,
+body.theme-day .leaflet-control-zoom-out {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border: 1px solid #000000 !important;
+}
+body.theme-day .leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.85) !important;
+  color: #52525b !important;
+  font-size: 10px !important;
+}
+body.theme-day .leaflet-control-attribution a {
+  color: #000000 !important;
+}
+
+/* Badge colors in Day Mode */
+body.theme-day .text-red-400 {
+  color: #dc2626 !important;
+}
+body.theme-day .bg-red-950\/20 {
+  background-color: #fee2e2 !important;
+}
+body.theme-day .text-amber-400 {
+  color: #d97706 !important;
+}
+body.theme-day .bg-amber-950\/20 {
+  background-color: #fef3c7 !important;
+}
+body.theme-day .text-emerald-400 {
+  color: #059669 !important;
+}
+body.theme-day .bg-emerald-950\/20 {
+  background-color: #d1fae5 !important;
+}
+
+/* Splitter in Day Mode */
+body.theme-day [role="separator"] {
+  border-color: #000000 !important;
+  background-color: #f4f4f5 !important;
+}
+body.theme-day [role="separator"] span {
+  background-color: #000000 !important;
+}
+
