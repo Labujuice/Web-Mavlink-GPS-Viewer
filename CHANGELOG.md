@@ -4,7 +4,7 @@
 
 ---
 
-## [Unreleased]
+## [0.2.0] - 2026-09-16
 
 ### 修復 (Fixed)
 - **MAVLink CRC_EXTRA 補齊與驗證校正**：
@@ -23,6 +23,8 @@
   - 指令發送（`SET_MESSAGE_INTERVAL` 與 `REQUEST_MESSAGE`）具備 1.2 秒超時等候機制，若收到飛控 ACK 立即於日誌顯示執行結果。
 - **傳統資料串流請求編碼**：
   - 新增 `REQUEST_DATA_STREAM` (#66) 編碼函數，提供向舊版或特規飛控請求成組串流能力。
+- **SNR 柱狀圖排序切換**：
+  - 新增 PRN 編號遞增與 SNR 訊號強度降序（高至低）切換按鈕，支援狀態持久化至 localStorage。
 - **專案授權協議與線上入口更新**：
   - 補上根目錄 [MIT License](LICENSE) 授權文件。
   - 於 `README.md` 標註線上即用體驗入口（[https://labujuice.github.io/Web-Mavlink-GPS-Viewer/](https://labujuice.github.io/Web-Mavlink-GPS-Viewer/)）與 Live Demo 徽章。
